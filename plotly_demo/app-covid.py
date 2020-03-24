@@ -113,7 +113,7 @@ def load_covid(url):
 
 def load_hospitals(path):
     df_hospitals = pd.read_csv(path, usecols=['X', 'Y', 'BEDS', 'NAME'])
-    df_hospitals['BEDS_label']= df_hospitals.BEDS.replace(-999, 'unknown')
+    df_hospitals['BEDS_label'] = df_hospitals.BEDS.replace(-999, 'unknown')
     df_hospitals.BEDS = df_hospitals.BEDS.replace(-999, 0)
     return df_hospitals
 
@@ -485,7 +485,6 @@ def build_datashader_plot(
         lat = [None]
         lon = [None]
         customdata = [None]
-        marker = {}
 
     # Build map figure
     map_graph = {
@@ -497,7 +496,10 @@ def build_datashader_plot(
             'marker': dict(
                 size=0,
                 showscale=True,
-                colorscale=build_colorscale(colorscale_name, colorscale_transform, aggregate, aggregate_column),
+                colorscale=build_colorscale(
+                    colorscale_name, colorscale_transform,
+                    aggregate, aggregate_column
+                ),
                 cmin=cmin,
                 cmax=cmax
             ),
@@ -526,7 +528,7 @@ def build_datashader_plot(
                     'color': '#191a1a',
                 }
             }],
-            'showlegend':False
+            'showlegend': False
         },
     }
 
@@ -541,6 +543,7 @@ def build_datashader_plot(
                     color='black',
                     opacity=0.9,
                     sizeref=65,
+                    sizemin=2,
                 ),
                 'hoverinfo': 'none'
             },
@@ -553,6 +556,7 @@ def build_datashader_plot(
                     color='#f8f8f8',
                     opacity=0.9,
                     sizeref=65,
+                    sizemin=2,
                 ),
                 'hovertemplate': (
                     '<b>%{hovertext}</b><br><br>BEDS = %{text}<extra></extra>'
@@ -703,7 +707,6 @@ def build_updated_figures(
             transformer_4326_to_3857.transform(*reversed(row)) for row in coords
         ]
 
-    
     coordinates_4326 = relayout_data and relayout_data.get('mapbox._derived', {}).get('coordinates', None)
 
     if coordinates_4326:
@@ -774,7 +777,7 @@ def build_updated_figures(
             'margin': {'l': 10, 'r': 10, 't': 10, 'b': 10}
         }
     }
-
+    n_selected_indicator['data'][0]['domain'] =  {'x': [0, 1], 'y': [0, 0.5]}
 
     if df_hospitals is not None:
         n_selected_indicator['data'][0]['domain'] =  {'x': [0, 0.35], 'y': [0, 0.5]}
