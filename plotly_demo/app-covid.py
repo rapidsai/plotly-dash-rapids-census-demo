@@ -760,7 +760,6 @@ def build_updated_figures(
             'value': len(
                 df_hists
             ),
-            'domain': {'x': [0, 0.5], 'y': [0, 0.5]},
             'number': {
                 'font': {
                     'color': text_color
@@ -778,17 +777,17 @@ def build_updated_figures(
 
 
     if df_hospitals is not None:
+        n_selected_indicator['data'][0]['domain'] =  {'x': [0, 0.35], 'y': [0, 0.5]}
         x_range, y_range = zip(*coordinates_4326)
         x0, x1 = x_range
         y0, y1 = y_range
         query_expr_xy_hosp = f"(X >= {x0}) & (X <= {x1}) & (Y >= {y0}) & (Y <= {y1})"
-        print(query_expr_xy_hosp)
         df_hospitals = df_hospitals.query(query_expr_xy_hosp)
         n_selected_indicator['data'].append({
-            'title': {"text": "Number of Beds"},
+            'title': {"text": "Number of known beds"},
             'type': 'indicator',
             'value': df_hospitals.BEDS.sum(),
-            'domain': {'x': [0.5, 1], 'y': [0, 0.5]},
+            'domain': {'x': [0.35, 0.7], 'y': [0, 0.5]},
             'number': {
                 'font': {
                     'color': text_color
@@ -796,6 +795,19 @@ def build_updated_figures(
                 "valueformat": ","
             }
         })
+        n_selected_indicator['data'].append({
+            'title': {"text": "Population-Bed ratio"},
+            'type': 'indicator',
+            'value': round(len(df_hists)/df_hospitals.BEDS.sum()),
+            'domain': {'x': [0.70, 1], 'y': [0, 0.5]},
+            'number': {
+                'font': {
+                    'color': text_color
+                },
+                "valueformat": ","
+            }
+        })
+
     query_cache = {}
 
     if isinstance(df_map, cudf.DataFrame):
