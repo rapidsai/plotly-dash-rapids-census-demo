@@ -114,7 +114,8 @@ def load_covid(url):
 def load_hospitals(path):
     df_hospitals = pd.read_csv(path, usecols=['X', 'Y', 'BEDS', 'NAME'])
     df_hospitals['BEDS_label'] = df_hospitals.BEDS.replace(-999, 'unknown')
-    df_hospitals.BEDS = df_hospitals.BEDS.apply(lambda x: x if x > 150 else 150)
+    df_hospitals.BEDS = df_hospitals.BEDS.replace(-999, 0)
+    df_hospitals['BEDS_sizes'] = df_hospitals.BEDS.apply(lambda x: x if x > 150 else 150)
     return df_hospitals
 
 def set_projection_bounds(df_d):
@@ -550,7 +551,7 @@ def build_datashader_plot(
                 'lat': df_hospitals.Y.values,
                 'lon': df_hospitals.X.values,
                 'marker': go.scattermapbox.Marker(
-                    size=df_hospitals.BEDS.values + 250,
+                    size=df_hospitals.BEDS_sizes.values + 250,
                     color='black',
                     opacity=0.9,
                     sizeref=65,
@@ -562,7 +563,7 @@ def build_datashader_plot(
                 'lat': df_hospitals.Y.values,
                 'lon': df_hospitals.X.values,
                 'marker': go.scattermapbox.Marker(
-                    size=df_hospitals.BEDS.values,
+                    size=df_hospitals.BEDS_sizes.values,
                     color='#f8f8f8',
                     opacity=0.9,
                     sizeref=65,
