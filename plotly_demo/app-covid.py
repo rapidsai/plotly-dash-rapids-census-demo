@@ -104,8 +104,8 @@ def load_covid(url):
     df3 = pd.DataFrame({
         'date': np.repeat(df2.dateChecked, 3),
         'state': np.repeat(df2.state, 3),
-        'category': df2.category.str.split(',', expand=True).values.ravel(),
-        'cases':df2.count_val.str.split(',', expand=True).values.ravel()
+        'cases': df2.category.str.split(',', expand=True).values.ravel(),
+        'number of cases':df2.count_val.str.split(',', expand=True).values.ravel()
     }).sort_values(['state', 'date'])
 
     return df3
@@ -786,14 +786,12 @@ def build_updated_figures(
 
 def get_covid_bar_chart(df):
     fig = px.bar(
-            df, x="state", y="cases",
-            animation_frame="date", color='category',
+            df, x="state", y="number of cases",
+            animation_frame="date", color='cases',
             barmode="group",
             color_discrete_sequence=['gray', '#9D00DB', '#1F00BF'],
             template=template
         )
-    for index in range(len(fig.data)):
-        fig.data[index].name = fig.data[index].name.split('=')[1]
     return fig
 
 
