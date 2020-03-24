@@ -114,7 +114,7 @@ def load_covid(url):
 def load_hospitals(path):
     df_hospitals = pd.read_csv(path, usecols=['X', 'Y', 'BEDS', 'NAME'])
     df_hospitals['BEDS_label'] = df_hospitals.BEDS.replace(-999, 'unknown')
-    df_hospitals.BEDS = df_hospitals.BEDS.replace(-999, 0)
+    df_hospitals.BEDS = df_hospitals.BEDS.apply(lambda x: x if x > 150 else 150)
     return df_hospitals
 
 def set_projection_bounds(df_d):
@@ -278,6 +278,9 @@ app.layout = html.Div(children=[
         html.Div(children=[
             html.Div(
                 children=[
+                    html.Button(
+                        "Clear Selection", id='clear-covid', className='reset-button'
+                    ),
                     html.H4([
                         "Covid-19 Cases",
                     ], className="container_title"),
@@ -328,6 +331,14 @@ def clear_map(*args):
     [Input('clear-age', 'n_clicks'), Input('clear-all', 'n_clicks')]
 )
 def clear_age_hist_selections(*args):
+    return None
+
+
+@app.callback(
+    Output('covid-histogram', 'selectedData'),
+    [Input('clear-covid', 'n_clicks'), Input('clear-all', 'n_clicks')]
+)
+def clear_covid_hist_selections(*args):
     return None
 
 # Query string helpers
@@ -543,7 +554,6 @@ def build_datashader_plot(
                     color='black',
                     opacity=0.9,
                     sizeref=65,
-                    sizemin=2,
                 ),
                 'hoverinfo': 'none'
             },
@@ -556,7 +566,6 @@ def build_datashader_plot(
                     color='#f8f8f8',
                     opacity=0.9,
                     sizeref=65,
-                    sizemin=2,
                 ),
                 'hovertemplate': (
                     '<b>%{hovertext}</b><br><br>BEDS = %{text}<extra></extra>'
