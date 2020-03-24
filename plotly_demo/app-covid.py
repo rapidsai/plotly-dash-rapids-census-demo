@@ -187,7 +187,7 @@ app.layout = html.Div(children=[
                     ),
                 ]),
                 html.H4([
-                    "Selected Polpulation",
+                    "Selected Counts",
                 ], className="container_title"),
                 dcc.Loading(
                     dcc.Graph(
@@ -539,7 +539,8 @@ def build_datashader_plot(
                 'marker': go.scattermapbox.Marker(
                     size=df_hospitals.BEDS.values + 250,
                     color='black',
-                    sizeref=70,
+                    opacity=0.9,
+                    sizeref=65,
                 ),
                 'hoverinfo': 'none'
             },
@@ -550,8 +551,8 @@ def build_datashader_plot(
                 'marker': go.scattermapbox.Marker(
                     size=df_hospitals.BEDS.values,
                     color='#f8f8f8',
-                    opacity=1,
-                    sizeref=70,
+                    opacity=0.9,
+                    sizeref=65,
                 ),
                 'hovertemplate': (
                     '<b>%{hovertext}</b><br><br>BEDS = %{text}<extra></extra>'
@@ -701,6 +702,8 @@ def build_updated_figures(
         return [
             transformer_4326_to_3857.transform(*reversed(row)) for row in coords
         ]
+
+    
     coordinates_4326 = relayout_data and relayout_data.get('mapbox._derived', {}).get('coordinates', None)
 
     if coordinates_4326:
@@ -752,17 +755,20 @@ def build_updated_figures(
     # Build indicator figure
     n_selected_indicator = {
         'data': [{
+            'title': {"text": "Population"},
             'type': 'indicator',
             'value': len(
                 df_hists
             ),
+            'domain': {'x': [0, 0.5], 'y': [0, 0.5]},
             'number': {
                 'font': {
                     'color': text_color
                 },
-                "valueformat": ".0f"
+                "valueformat": ","
             }
-        }],
+        },
+        ],
         'layout': {
             'template': template,
             'height': row_heights[0],
@@ -770,6 +776,26 @@ def build_updated_figures(
         }
     }
 
+
+    if df_hospitals is not None:
+        x_range, y_range = zip(*coordinates_4326)
+        x0, x1 = x_range
+        y0, y1 = y_range
+        query_expr_xy_hosp = f"(X >= {x0}) & (X <= {x1}) & (Y >= {y0}) & (Y <= {y1})"
+        print(query_expr_xy_hosp)
+        df_hospitals = df_hospitals.query(query_expr_xy_hosp)
+        n_selected_indicator['data'].append({
+            'title': {"text": "Number of Beds"},
+            'type': 'indicator',
+            'value': df_hospitals.BEDS.sum(),
+            'domain': {'x': [0.5, 1], 'y': [0, 0.5]},
+            'number': {
+                'font': {
+                    'color': text_color
+                },
+                "valueformat": ","
+            }
+        })
     query_cache = {}
 
     if isinstance(df_map, cudf.DataFrame):
