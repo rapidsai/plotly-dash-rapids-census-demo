@@ -285,6 +285,7 @@ app.layout = html.Div(children=[
                     dcc.Graph(
                         id='covid-histogram',
                         config={'displayModeBar': False},
+                        figure=blank_fig(row_heights[1]),
                         animate=True
                     ),
                 ],
@@ -462,12 +463,10 @@ def build_datashader_plot(
         # Shade aggregation into an image that we can add to the map as a mapbox
         # image layer
         max_px = 1
-        if n_selected < 5000:
-            max_px = 10
         img = tf.shade(agg, **datashader_color_scale)
         img = tf.dynspread(
                     img,
-                    threshold=0.5,
+                    threshold=0.1,
                     max_px=max_px,
                     shape='circle',
                 ).to_pil()
