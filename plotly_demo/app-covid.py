@@ -52,7 +52,6 @@ template = {
 
 colors = {}
 mappings = {}
-colors['sex'] = ['#0000FF', '#00ff00']
 
 # Load mapbox token from environment variable or file
 token = os.getenv('MAPBOX_TOKEN')
@@ -62,18 +61,9 @@ if not token:
 
 # Names of float columns
 float_columns = [
-    'x', 'y', 'age', 'sex'
+    'x', 'y', 'age'
 ]
 
-column_labels = {
-    'sex': 'sex',
-}
-
-mappings['sex'] = {
-    -1: "All genders",
-    0: 'Males',
-    1: 'Females'
-}
 
 data_center_3857, data_3857, data_4326, data_center_4326 = [], [], [], []
 
@@ -86,7 +76,7 @@ def load_dataset(path):
         pandas DataFrame
     """
     df_d = cudf.read_parquet(path)
-    df_d.sex = df_d.sex.to_pandas().astype('category')
+    # df_d.sex = df_d.sex.to_pandas().astype('category')
     return df_d
 
 def load_covid(url):
@@ -909,7 +899,7 @@ def register_update_plots_callback(client):
 
 def publish_dataset_to_cluster():
 
-    data_path = "../data/census_data_epsg_3857.parquet/*"
+    data_path = "../data/census_data_minimized.parquet/*"
 
     covid_data_path = "https://covidtracking.com/api/states/daily"
     # Note: The creation of a Dask LocalCluster must happen inside the `__main__` block,
