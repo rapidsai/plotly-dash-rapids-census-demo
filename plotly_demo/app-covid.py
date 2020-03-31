@@ -107,7 +107,7 @@ def load_covid(BASE_URL):
     else:
         df = cudf.read_parquet('../data/'+today+'.parquet').to_pandas()
 
-    df_combined_key = df[['Admin2', 'Combined_Key']].dropna()
+    df_combined_key = df[['Admin2', 'Combined_Key', 'Lat', 'Long_']].dropna()
     df_combined_key.index = df_combined_key.Admin2
     df_combined_key['COUNTY'] = df_combined_key.index
     df_combined_key.drop('Admin2', axis=1, inplace=True)
@@ -123,8 +123,6 @@ def load_covid(BASE_URL):
         {
             'Deaths': 'sum', 
             'Confirmed': 'sum',
-            'Lat': 'mean',
-            'Long_': 'mean'
         }
     ).reset_index()
 
@@ -654,25 +652,28 @@ def build_datashader_plot(
         size_markers = np.copy(df_covid.Confirmed.values)
         size_markers_labels = np.copy(size_markers)
 
-        factor = 'Confirmed Cases as of '+today+' = %{text}'
-        sizeref = 120
-        marker_border = 250
+        if covid_count_type == 'Total Cases':
+            size_markers[size_markers <= 2] = 2
+            factor = 'Confirmed Cases as of '+today+' = %{text}'
+            sizeref = 120
+            marker_border = 250
         if covid_count_type == '% change since last 2 days':
             size_markers = (np.nan_to_num((size_markers - df_covid_yesterday.Confirmed.values)/df_covid_yesterday.Confirmed.values)*100).astype('int')
             size_markers_labels = np.copy(size_markers)
+            size_markers[size_markers <= 1] = 1
             factor = 'Percentage change since '+yesterday+' = %{text}%'
             sizeref = 10
             marker_border = 21
         elif covid_count_type == 'Cases/County_population(updated. 2018)':
             df_covid = df_covid.merge(df_acs2018, on='COUNTY')
             size_markers = df_covid.Confirmed.values
-            size_markers = np.around((np.nan_to_num(size_markers/df_covid.acs2018_population.values)).astype('float'), 5)
+            size_markers = np.around(np.nan_to_num(size_markers/df_covid.acs2018_population.values).astype('float'), 5)
             size_markers_labels = [np.format_float_scientific(x) for x in list(size_markers)]
+            size_markers[size_markers <= 0.0003] = 0.0003
             factor = '<i>sourced from LATEST 2018 census projection </i> <br> No. of cases / county population = %{text}'
             sizeref = 0.0001
             marker_border = 0.0002
 
-        size_markers[size_markers <= 0] = 2
         size_markers[size_markers >= np.percentile(size_markers, 99.9)] = np.percentile(size_markers, 99.9)
 
         map_graph['data'].append(
