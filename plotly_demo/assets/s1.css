@@ -118,7 +118,7 @@
     font-family: "Open Sans", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
     color: #cfd8dc;  /* Material blue-grey 100 */
     background-color: #2a2a2e;  /* Material blue-grey 900*/
-    margin: 5%;
+    margin: 2%;
   }
   
   
@@ -232,8 +232,8 @@
   input[type="password"],
   textarea,
   select {
-    height: 38px;
-    padding: 6px 10px; /* The 6px vertically centers text on FF, ignored by Webkit */
+    height: 5px;
+    padding: 1px 10px; /* The 6px vertically centers text on FF, ignored by Webkit */
     background-color: #fff;
     border: 1px solid #D1D1D1;
     border-radius: 4px;
@@ -310,7 +310,7 @@
   }
   th:not(.CalendarDay),
   td:not(.CalendarDay) {
-    padding: 4px 10px;
+    padding: 1px 10px;
     text-align: left;
     /*border-bottom: 1px solid #E1E1E1;*/
   }
@@ -416,7 +416,7 @@
   
   .container_title {
     margin-top: 0;
-    margin-bottom: 0.2em;
+    margin-bottom: 0.5em;
     font-size: 2.6rem;
     line-height: 2.6rem;
   }

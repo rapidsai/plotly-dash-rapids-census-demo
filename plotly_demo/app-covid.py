@@ -21,8 +21,9 @@ from dask import delayed
 from distributed import Client
 from dask_cuda import LocalCUDACluster
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import plotly.express as px
-
+import datetime
 import cudf
 import pandas as pd
 import cupy
@@ -36,7 +37,7 @@ text_color = "#cfd8dc"  # Material blue-grey 100
 mapbox_land_color = "#343332"
 
 # Figure template
-row_heights = [80, 460, 200]
+row_heights = [120, 460, 200, 1600, 300]
 template = {
     'layout': {
         'paper_bgcolor': bgcolor,
@@ -45,7 +46,7 @@ template = {
         "margin": {"r": 0, "t": 30, "l": 0, "b": 20},
         'bargap': 0.05,
         'xaxis': {'showgrid': False, 'automargin': True},
-        'yaxis': {'showgrid': True, 'automargin': True},
+        'yaxis': {'showgrid': True, 'automargin': True, 'gridcolor': 'rgba(139, 139, 139, 0.1)'},
     }
 }
 
@@ -70,36 +71,68 @@ data_center_3857, data_3857, data_4326, data_center_4326 = [], [], [], []
 def load_dataset(path):
     """
     Args:
-        path: Path to arrow file containing mortgage dataset
+        path: Path to arrow file containing census2010 dataset
 
     Returns:
-        pandas DataFrame
+        cudf DataFrame
     """
     df_d = cudf.read_parquet(path)
     # df_d.sex = df_d.sex.to_pandas().astype('category')
     return df_d
 
-def load_covid(url):
-    df = pd.DataFrame(requests.get(url).json())
-    valid_dates = df.groupby('dateChecked').count().query('state == 56').index.tolist()
-    valid_df = df.query('dateChecked in @valid_dates').fillna(0, inplace=False)
 
-    df2 = valid_df.assign(count_val = valid_df.positive.astype(str) + ', ' + \
-      (valid_df.positive + valid_df.negative).astype(str) + ', ' + valid_df.death.astype(str))
+def load_covid(BASE_URL):
+    print('loading latest covid dataset...')
+    df_temp = []
 
-    df2.drop(['positive', 'negative', 'pending', 'death'], axis=1, inplace=True)
+    last_n_days = (datetime.date.today() - datetime.date(2020, 3, 25)).days
+    today = datetime.date.today().strftime("%m-%d-%Y")
 
-    df2['category'] = "positive tests,total tests,death"
+    if not os.path.exists('../data/'+today+'.parquet'):
+        print('downloading latest covid dataset...')
+        for i in range(last_n_days+1):
+            date_ = str((datetime.date.today() - datetime.timedelta(days=i+1)).strftime("%m-%d-%Y"))
+            if not os.path.exists('../data/'+date_+'.parquet'):
+                df_temp.append(
+                    pd.read_csv(BASE_URL % date_,
+                    usecols=['Lat', 'Long_','Province_State', 'Last_Update', 'Confirmed', 'Deaths', 'Recovered', 'Active', 'Admin2', 'Country_Region', 'Combined_Key']
+                ).query('Country_Region == "US"'))
+            else:
+                df_temp.append(
+                    cudf.read_parquet('../data/'+date_+'.parquet').to_pandas()
+                )
+                break
+        df = pd.concat(df_temp).query("Province_State not in ['Wuhan Evacuee','Diamond Princess','Recovered']")
+        df.to_parquet('../data/'+today+'.parquet')
+    else:
+        df = cudf.read_parquet('../data/'+today+'.parquet').to_pandas()
 
-    df3 = pd.DataFrame({
-        'date': np.repeat(df2.dateChecked, 3),
-        'state': np.repeat(df2.state, 3),
-        'cases': df2.category.str.split(',', expand=True).values.ravel(),
-        'number of cases':df2.count_val.str.split(',', expand=True).values.ravel()
-    }).sort_values(['state', 'date'])
+    df_combined_key = df[['Admin2', 'Combined_Key']].dropna()
+    df_combined_key.index = df_combined_key.Admin2
+    df_combined_key['COUNTY'] = df_combined_key.index
+    df_combined_key.drop('Admin2', axis=1, inplace=True)
+    df_combined_key.drop_duplicates(inplace=True)
 
-    return df3
 
+    df.Last_Update = pd.to_datetime(df.Last_Update).dt.date
+    df.rename({
+        'Admin2': 'COUNTY'
+    }, axis=1,inplace=True)
+    df_states_last_5_days = df.groupby(['Province_State','Last_Update']).sum().reset_index()
+    df_county = df.groupby(['COUNTY','Last_Update']).agg(
+        {
+            'Deaths': 'sum', 
+            'Confirmed': 'sum',
+            'Lat': 'mean',
+            'Long_': 'mean'
+        }
+    ).reset_index()
+
+    df_county = df_county.merge(df_combined_key, on='COUNTY')
+    last_2_days = list(np.sort(df_county.Last_Update.unique()))[-2:]
+    df_count_latest = df_county.query('Last_Update == @last_2_days[-1]').drop_duplicates('COUNTY').reset_index()
+    df_count_latest_minus_1 = df_county.query('Last_Update == @last_2_days[0]').drop_duplicates('COUNTY').reset_index()
+    return (df_states_last_5_days, df_count_latest, df_count_latest_minus_1)
 
 def load_hospitals(path):
     df_hospitals = pd.read_csv(path, usecols=['X', 'Y', 'BEDS', 'NAME'])
@@ -116,7 +149,7 @@ def set_projection_bounds(df_d):
     transformer_3857_to_4326 = Transformer.from_crs("epsg:3857", "epsg:4326")
     def epsg_3857_to_4326(coords):
         return [list(reversed(transformer_3857_to_4326.transform(*row))) for row in coords]
-    
+
     data_3857 = (
         [df_d.x.min(), df_d.y.min()],
         [df_d.x.max(), df_d.y.max()]
@@ -155,7 +188,7 @@ app = dash.Dash(__name__)
 app.layout = html.Div(children=[
     html.Div([
         html.H1(children=[
-            'Census 2010, Hospitals & Covid-19 Cases',
+            'US Population 2010 | COVID-19',
             html.A(
                 html.Img(
                     src="https://camo.githubusercontent.com/38ca5c5f7d6afc09f8d50fd88abd4b212f0a6375/68747470733a2f2f7261706964732e61692f6173736574732f696d616765732f7261706964735f6c6f676f2e706e67",
@@ -178,7 +211,7 @@ app.layout = html.Div(children=[
                     ),
                 ]),
                 html.H4([
-                    "Selected Counts",
+                    "Population(2010) and Known Hospital Beds",
                 ], className="container_title"),
                 dcc.Loading(
                     dcc.Graph(
@@ -194,9 +227,10 @@ app.layout = html.Div(children=[
                     html.Button(
                         "Reset GPU", id='reset-gpu', className='reset-button'
                     ),
+                    html.Div(id='reset-gpu-complete', style={'display': 'hidden'})
                 ]),
                 html.H4([
-                    "Configuration",
+                    "Display Options",
                 ], className="container_title"),
                 html.Table([
                     html.Col(style={'width': '100px'}),
@@ -204,18 +238,18 @@ app.layout = html.Div(children=[
                     html.Col(),
                     html.Tr([
                             html.Td(
-                                html.Div("Hospitals"), className="config-label"
+                                html.Div("Population"), className="config-label"
                             ),
                             html.Td(daq.DarkThemeProvider(daq.BooleanSwitch(
                                 on=True,
                                 color='#00cc96',
-                                id='hospitals-toggle',
+                                id='population-toggle',
                             ))),
                             html.Td(
-                                html.Div("Color scale"), className="config-label"
+                                html.Div("Color Scale"), className="config-label"
                             ),
                             html.Td(dcc.Dropdown(
-                                id='colorscale-dropdown',
+                                id='colorscale-dropdown-population',
                                 options=[
                                     {'label': cs, 'value': cs}
                                     for cs in ['Viridis', 'Cividis', 'Inferno', 'Magma', 'Plasma']
@@ -223,8 +257,54 @@ app.layout = html.Div(children=[
                                 value='Viridis',
                                 searchable=False,
                                 clearable=False,
-                            ), style={'width': '50%'}),
-                            html.Div(id='reset-gpu-complete', style={'display': 'hidden'})
+                            ), style={'width': '50%', 'height':'15px'}),
+                        ]),
+                    html.Tr([
+                            html.Td(
+                                html.Div("Hospitals"), className="config-label"
+                            ),
+                            html.Td(daq.DarkThemeProvider(daq.BooleanSwitch(
+                                on=False,
+                                color='#00cc96',
+                                id='hospital-toggle',
+                            ))),
+                            html.Td(
+                                html.Div("Color Setting"), className="config-label"
+                            ),
+                            html.Td(dcc.Dropdown(
+                                id='colorscale-dropdown-hospital',
+                                options=[
+                                    {'label': 'white', 'value': 'white'},
+                                    {'label': 'blue', 'value': '#00d0ff'},
+                                    {'label': 'orange', 'value': '#ffa41c'}
+                                ],
+                                value='white',
+                                searchable=False,
+                                clearable=False,
+                            ), style={'width': '50%','height':'15px'}),
+                        ]),
+                    html.Tr([
+                            html.Td(
+                                html.Div("COVID-19"), className="config-label"
+                            ),
+                            html.Td(daq.DarkThemeProvider(daq.BooleanSwitch(
+                                on=True,
+                                color='#00cc96',
+                                id='covid-toggle',
+                            ))),
+                            html.Td(
+                                html.Div("Count Type"), className="config-label"
+                            ),
+                            html.Td(dcc.Dropdown(
+                                id='covid_count_type',
+                                options=[
+                                    {'label': cs, 'value': cs}
+                                    for cs in ['Total Cases', 'Cases/County_population(updated. 2018)', '% change since last 2 days']
+                                ],
+                                value='Total Cases',
+                                searchable=False,
+                                clearable=False,
+                            ), style={'width': '50%', 'height':'15px'}),
                         ])
                 ], style={'width': '100%', 'height': row_heights[0]}),
             ], className='six columns pretty_container', id="config-div"),
@@ -232,7 +312,7 @@ app.layout = html.Div(children=[
         html.Div(children=[
             html.Button("Clear Selection", id='reset-map', className='reset-button'),
             html.H4([
-                "US Population(each individual)",
+                "Population Density(2010), Known Hospital and Beds, and Reported COVID Cases by County | Zoom to filter",
             ], className="container_title"),
             dcc.Graph(
                 id='map-graph',
@@ -253,13 +333,13 @@ app.layout = html.Div(children=[
                         "Clear Selection", id='clear-age', className='reset-button'
                     ),
                     html.H4([
-                        "Age",
+                        "Population by Age(2010)",
                     ], className="container_title"),
                     
                     dcc.Graph(
                         id='age-histogram',
                         config={'displayModeBar': False},
-                        figure=blank_fig(row_heights[1]),
+                        figure=blank_fig(row_heights[4]),
                         animate=True
                     ),
                 ],
@@ -273,13 +353,13 @@ app.layout = html.Div(children=[
                         "Clear Selection", id='clear-covid', className='reset-button'
                     ),
                     html.H4([
-                        "Covid-19 Cases",
+                        "Reported COVID Cases (total) and deaths (total) by State",
                     ], className="container_title"),
-                    
+
                     dcc.Graph(
                         id='covid-histogram',
                         config={'displayModeBar': False},
-                        figure=blank_fig(row_heights[1]),
+                        figure=blank_fig(row_heights[3]),
                         animate=True
                     ),
                 ],
@@ -403,173 +483,234 @@ def build_colorscale(colorscale_name, transform, agg, agg_col):
 
 
 def build_datashader_plot(
-        df, aggregate, aggregate_column, colorscale_name, colorscale_transform,
-        new_coordinates, position, x_range, y_range, df_hospitals
+        df, aggregate, aggregate_column, new_coordinates, position,
+        x_range, y_range, df_hospitals, df_covid, df_acs2018, population_enabled,
+        population_colorscale, hospital_enabled, hospital_colorscale,
+        covid_enabled, covid_count_type, colorscale_transform
 ):
     """
     Build choropleth figure
 
     Args:
-        df: pandas or cudf DataFrame
-        aggregate: Aggregate operation (count, mean, etc.)
-        aggregate_column: Column to perform aggregate on. Ignored for 'count' aggregate
-        colorscale_name: Name of plotly colorscale
-        colorscale_transform: Colorscale transformation
-        clear_selection: If true, clear choropleth selection. Otherwise leave
-            selection unchanged
+
 
     Returns:
         Choropleth figure dictionary
     """
-
-    global data_3857, data_center_3857, data_4326, data_center_4326
-
-    x0, x1 = x_range
-    y0, y1 = y_range
-
-    # Build query expressions
-    query_expr_xy = f"(x >= {x0}) & (x <= {x1}) & (y >= {y0}) & (y <= {y1})"
-    datashader_color_scale = {}
-
-    if aggregate == 'count_cat':
-        datashader_color_scale['color_key'] = colors[aggregate_column] 
-    else:
-        datashader_color_scale['cmap'] = [i[1] for i in build_colorscale(colorscale_name, colorscale_transform, aggregate, aggregate_column)]
-        if not isinstance(df, cudf.DataFrame):
-            df[aggregate_column] = df[aggregate_column].astype('int8')
-
-    cvs = ds.Canvas(
-        plot_width=1400,
-        plot_height=1400,
-        x_range=x_range, y_range=y_range
-    )
-    agg = cvs.points(
-        df, x='x', y='y', agg=getattr(ds, aggregate)(aggregate_column)
-    )
-
-    cmin = cupy.asnumpy(agg.min().data)
-    cmax = cupy.asnumpy(agg.max().data)
-    # Count the number of selected people
-    temp = agg.sum()
-    temp.data = cupy.asnumpy(temp.data)
-    n_selected = int(temp)
-
-    if n_selected == 0:
-        # Nothing to display
-        lat = [None]
-        lon = [None]
-        customdata = [None]
-        marker = {}
-        layers = []
-    else:
-        # Shade aggregation into an image that we can add to the map as a mapbox
-        # image layer
-        max_px = 1
-        img = tf.shade(agg, **datashader_color_scale)
-        img = tf.dynspread(
-                    img,
-                    threshold=0.1,
-                    max_px=max_px,
-                    shape='circle',
-                ).to_pil()
-
-        # Add image as mapbox image layer. Note that as of version 4.4, plotly will
-        # automatically convert the PIL image object into a base64 encoded png string
-        layers = [
-            {
-                "sourcetype": "image",
-                "source": img,
-                "coordinates": new_coordinates
-            }
-        ]
-
-        # Do not display any mapbox markers
-        lat = [None]
-        lon = [None]
-        customdata = [None]
-
-    # Build map figure
     map_graph = {
-        'data': [
-        {
-            'type': 'scattermapbox',
-            'lat': lat, 'lon': lon,
-            'customdata': customdata,
-            'marker': dict(
-                size=0,
-                showscale=True,
-                colorscale=build_colorscale(
-                    colorscale_name, colorscale_transform,
-                    aggregate, aggregate_column
-                ),
-                cmin=cmin,
-                cmax=cmax
-            ),
-            'hoverinfo': 'none'
-        },],
+        'data': [],
         'layout': {
-            'template': template,
-            'uirevision': True,
-            'mapbox': {
-                'style': "dark",
-                'accesstoken': token,
-                'layers': layers,
-            },
-            'margin': {"r": 0, "t": 0, "l": 0, "b": 0},
-            'height': 500,
-            'shapes': [{
-                'type': 'rect',
-                'xref': 'paper',
-                'yref': 'paper',
-                'x0': 0,
-                'y0': 0,
-                'x1': 1,
-                'y1': 1,
-                'line': {
-                    'width': 1,
-                    'color': '#191a1a',
-                }
-            }],
-            'showlegend': False
-        },
+                'template': template,
+                'uirevision': True,
+                'mapbox': {
+                    'style': "dark",
+                    'accesstoken': token,
+                },
+                'margin': {"r": 0, "t": 0, "l": 0, "b": 0},
+                'height': 500,
+                'shapes': [{
+                    'type': 'rect',
+                    'xref': 'paper',
+                    'yref': 'paper',
+                    'x0': 0,
+                    'y0': 0,
+                    'x1': 1,
+                    'y1': 1,
+                    'line': {
+                        'width': 1,
+                        'color': '#191a1a',
+                    }
+                }],
+                'showlegend': False
+            }
     }
+    if population_enabled:
+        global data_3857, data_center_3857, data_4326, data_center_4326
+
+        x0, x1 = x_range
+        y0, y1 = y_range
+
+        # Build query expressions
+        query_expr_xy = f"(x >= {x0}) & (x <= {x1}) & (y >= {y0}) & (y <= {y1})"
+        datashader_color_scale = {}
+
+        if aggregate == 'count_cat':
+            datashader_color_scale['color_key'] = colors[aggregate_column] 
+        else:
+            datashader_color_scale['cmap'] = [i[1] for i in build_colorscale(population_colorscale, colorscale_transform, aggregate, aggregate_column)]
+            if not isinstance(df, cudf.DataFrame):
+                df[aggregate_column] = df[aggregate_column].astype('int8')
+
+        cvs = ds.Canvas(
+            plot_width=2400,
+            plot_height=1200,
+            x_range=x_range, y_range=y_range
+        )
+        agg = cvs.points(
+            df, x='x', y='y', agg=getattr(ds, aggregate)(aggregate_column)
+        )
+
+        cmin = cupy.asnumpy(agg.min().data)
+        cmax = cupy.asnumpy(agg.max().data)
+        # Count the number of selected people
+        temp = agg.sum()
+        temp.data = cupy.asnumpy(temp.data)
+        n_selected = int(temp)
+        layers = []
+        if n_selected == 0:
+            # Nothing to display
+            lat = [None]
+            lon = [None]
+            customdata = [None]
+            marker = {}
+            layers = []
+        else:
+            # Shade aggregation into an image that we can add to the map as a mapbox
+            # image layer
+            max_px = 1
+            img = tf.shade(agg, **datashader_color_scale).to_pil()
+
+
+            # Add image as mapbox image layer. Note that as of version 4.4, plotly will
+            # automatically convert the PIL image object into a base64 encoded png string
+            layers = [
+                {
+                    "sourcetype": "image",
+                    "source": img,
+                    "coordinates": new_coordinates
+                }
+            ]
+
+            # Do not display any mapbox markers
+            lat = [None]
+            lon = [None]
+            customdata = [None]
+
+        # Build map figure
+        map_graph['data'].append(
+            {
+                'type': 'scattermapbox',
+                'lat': lat, 'lon': lon,
+                'customdata': customdata,
+                'marker': dict(
+                    size=0,
+                    showscale=True,
+                    colorscale=build_colorscale(
+                        population_colorscale, colorscale_transform,
+                        aggregate, aggregate_column
+                    ),
+                    cmin=cmin,
+                    cmax=cmax
+                ),
+                'hoverinfo': 'none'
+            }
+        )
+
+        map_graph['layout']['mapbox'].update({'layers': layers})
+    map_graph['layout']['mapbox'].update(position)
 
     if df_hospitals is not None and isinstance(df_hospitals, pd.DataFrame):
-        map_graph['data'] = map_graph['data'] + [
+        map_graph['data'].append(
              {
                 'type': 'scattermapbox',
                 'lat': df_hospitals.Y.values,
                 'lon': df_hospitals.X.values,
                 'marker': go.scattermapbox.Marker(
                     size=df_hospitals.BEDS_sizes.values + 250,
+                    sizemin=2,
                     color='black',
                     opacity=0.9,
-                    sizeref=65,
+                    sizeref=120,
                 ),
                 'hoverinfo': 'none'
-            },
-            {
+            }
+        )
+        map_graph['data'].append({
                 'type': 'scattermapbox',
                 'lat': df_hospitals.Y.values,
                 'lon': df_hospitals.X.values,
                 'marker': go.scattermapbox.Marker(
                     size=df_hospitals.BEDS_sizes.values,
-                    color='#f8f8f8',
+                    sizemin=2,
+                    color=hospital_colorscale,
                     opacity=0.9,
-                    sizeref=65,
+                    sizeref=120,
                 ),
                 'hovertemplate': (
                     '<b>%{hovertext}</b><br><br>BEDS = %{text}<extra></extra>'
                 ),
-                'text': df_hospitals.BEDS_label,
+                'text': df_hospitals.BEDS,
                 'hovertext': df_hospitals.NAME,
                 'mode': 'markers',
                 'showlegend': False,
                 'subplot': 'mapbox'
             }
-        ]
+        )
+    if df_covid is not None:
+        df_covid_yesterday = df_covid[2]
+        yesterday = df_covid_yesterday.Last_Update.max().strftime("%B, %d")
+        df_covid = df_covid[1]
+        today = df_covid.Last_Update.max().strftime("%B, %d")
+        size_markers = np.copy(df_covid.Confirmed.values)
+        size_markers_labels = np.copy(size_markers)
 
-    map_graph['layout']['mapbox'].update(position)
+        factor = 'Confirmed Cases as of '+today+' = %{text}'
+        sizeref = 120
+        marker_border = 250
+        if covid_count_type == '% change since last 2 days':
+            size_markers = (np.nan_to_num((size_markers - df_covid_yesterday.Confirmed.values)/df_covid_yesterday.Confirmed.values)*100).astype('int')
+            size_markers_labels = np.copy(size_markers)
+            factor = 'Percentage change since '+yesterday+' = %{text}%'
+            sizeref = 10
+            marker_border = 21
+        elif covid_count_type == 'Cases/County_population(updated. 2018)':
+            df_covid = df_covid.merge(df_acs2018, on='COUNTY')
+            size_markers = df_covid.Confirmed.values
+            size_markers = np.around((np.nan_to_num(size_markers/df_covid.acs2018_population.values)).astype('float'), 5)
+            size_markers_labels = [np.format_float_scientific(x) for x in list(size_markers)]
+            factor = '<i>sourced from LATEST 2018 census projection </i> <br> No. of cases / county population = %{text}'
+            sizeref = 0.0001
+            marker_border = 0.0002
+
+        size_markers[size_markers <= 0] = 2
+        size_markers[size_markers >= np.percentile(size_markers, 99.9)] = np.percentile(size_markers, 99.9)
+
+        map_graph['data'].append(
+             {
+                'type': 'scattermapbox',
+                'lat': df_covid.Lat.values,
+                'lon': df_covid.Long_.values,
+                'marker': go.scattermapbox.Marker(
+                    size=size_markers + marker_border,
+                    sizemin=2,
+                    color='black',
+                    opacity=0.6,
+                    sizeref=sizeref,
+                ),
+                'hoverinfo': 'none'
+            }
+        )
+        map_graph['data'].append({
+                'type': 'scattermapbox',
+                'lat': df_covid.Lat.values,
+                'lon': df_covid.Long_.values,
+                'marker': go.scattermapbox.Marker(
+                    size=size_markers,
+                    sizemin=2,
+                    color='#f20e5a',
+                    opacity=0.6,
+                    sizeref=sizeref,
+                ),
+                'hovertemplate': (
+                    '<b>%{hovertext}</b><br><br>'+factor+'<extra></extra>'
+                ),
+                'text': size_markers_labels,
+                'hovertext': df_covid.Combined_Key,
+                'mode': 'markers',
+                'showlegend': False,
+                'subplot': 'mapbox'
+            }
+        )
 
     return map_graph
 
@@ -601,8 +742,6 @@ def build_histogram_default_bins(
             'data':[],
             'layout': {
                 'xaxis': {
-                    'type': 'log',
-                    'range': [0, 8],  # Up to 100M
                     'title': {
                         'text': "Count"
                     }
@@ -618,8 +757,6 @@ def build_histogram_default_bins(
             'data':[],
             'layout': {
                 'yaxis': {
-                    'type': 'log',
-                    'range': [0, 8],  # Up to 100M
                     'title': {
                         'text': "Count"
                     }
@@ -664,21 +801,13 @@ def build_histogram_default_bins(
 
 
 def build_updated_figures(
-        df, df_hospitals, relayout_data, selected_age,
-        aggregate, colorscale_name
+        df, df_hospitals, df_covid, df_acs2018, relayout_data, selected_age,
+        aggregate, population_enabled, population_colorscale,
+        hospital_enabled, hospital_colorscale,
+        covid_enabled, covid_count_type,
 ):
     """
     Build all figures for dashboard
-
-    Args:
-        df: pandas or cudf DataFrame
-        relayout_data: relayout_data for datashader figure
-        selected_age_male: selectedData for age-male histogram
-        selected_age_female: selectedData for age-female histogram
-        aggregate: Aggregate operation for choropleth (count, mean, etc.)
-        aggregate_column: Aggregate column for choropleth
-        colorscale_name: Colorscale name from plotly.colors.sequential
-        colorscale_transform: Colorscale transformation ('linear', 'sqrt', 'cbrt', 'log')
 
     Returns:
         tuple of figures in the following order
@@ -750,22 +879,26 @@ def build_updated_figures(
 
     datashader_plot = build_datashader_plot(
         df.query(all_hists_query) if all_hists_query else df, aggregate,
-        aggregate_column, colorscale_name, colorscale_transform, new_coordinates, position, x_range, y_range,
-        df_hospitals
-        )
+        aggregate_column, new_coordinates, position, x_range, y_range,
+        df_hospitals, df_covid, df_acs2018, population_enabled, population_colorscale,
+        hospital_enabled, hospital_colorscale,
+        covid_enabled, covid_count_type,
+        colorscale_transform
+    )
 
     df_hists = df_map.query(all_hists_query) if all_hists_query else df_map
     # Build indicator figure
     n_selected_indicator = {
         'data': [{
-            'title': {"text": "Population"},
+            'title': {"text": "Visible Population"},
             'type': 'indicator',
             'value': len(
                 df_hists
             ),
             'number': {
                 'font': {
-                    'color': text_color
+                    'color': text_color,
+                    'size': '60px'
                 },
                 "valueformat": ","
             }
@@ -787,25 +920,27 @@ def build_updated_figures(
         query_expr_xy_hosp = f"(X >= {x0}) & (X <= {x1}) & (Y >= {y0}) & (Y <= {y1})"
         df_hospitals = df_hospitals.query(query_expr_xy_hosp)
         n_selected_indicator['data'].append({
-            'title': {"text": "Number of known beds"},
+            'title': {"text": "Known Hopital Beds"},
             'type': 'indicator',
             'value': df_hospitals.BEDS.sum(),
             'domain': {'x': [0.35, 0.7], 'y': [0, 0.5]},
             'number': {
                 'font': {
-                    'color': text_color
+                    'color': text_color,
+                    'size': '60px'
                 },
                 "valueformat": ","
             }
         })
         n_selected_indicator['data'].append({
-            'title': {"text": "Population-Bed ratio"},
+            'title': {"text": "People to Beds"},
             'type': 'indicator',
             'value': round(len(df_hists)/df_hospitals.BEDS.sum()),
             'domain': {'x': [0.70, 1], 'y': [0, 0.5]},
             'number': {
                 'font': {
-                    'color': text_color
+                    'color': text_color,
+                    'size': '60px'
                 },
                 "valueformat": ","
             }
@@ -826,13 +961,19 @@ def build_updated_figures(
 
 
 def get_covid_bar_chart(df):
-    fig = px.bar(
-            df, x="state", y="number of cases",
-            animation_frame="date", color='cases',
-            barmode="group",
-            color_discrete_sequence=['gray', '#9D00DB', '#1F00BF'],
-            template=template
-        )
+    df = df[0]
+    fig = make_subplots(rows=12, cols=5, subplot_titles=df.Province_State.unique().tolist(),)
+    index = 0
+    for state in df.Province_State.unique().tolist():
+        df_temp = df.query('Province_State == @state')
+        fig.add_trace(go.Scatter(x=df_temp.Last_Update, y=df_temp.Confirmed, name='Confirmed', marker=dict(color='#c724e5'), hoverinfo='text', hovertemplate='Confirmed=%{text}<extra></extra>', text=df_temp.Confirmed), row=int(index/5) + 1, col=int(index%5)+1)
+        fig.update_yaxes(rangemode='tozero', row=int(index/5) + 1, col=int(index%5)+1)
+        fig.add_trace(go.Scatter(x=df_temp.Last_Update, y=df_temp.Deaths, name='Deaths', marker=dict(color='#b7b7b7'), hoverinfo='text', hovertemplate='Deaths=%{text}<extra></extra>', text=df_temp.Deaths), row=int(index/5) + 1, col=int(index%5)+1)
+        index += 1
+    fig.update_layout(
+        template=template,
+        showlegend=False,
+    )
     return fig
 
 
@@ -858,33 +999,44 @@ def register_update_plots_callback(client):
          Output('age-histogram', 'figure')
          ],
         [Input('map-graph', 'relayoutData'), Input('age-histogram', 'selectedData'),
-            Input('colorscale-dropdown', 'value'), Input('hospitals-toggle', 'on')
+            Input('population-toggle', 'on'), Input('colorscale-dropdown-population', 'value'), 
+            Input('hospital-toggle', 'on'), Input('colorscale-dropdown-hospital', 'value'),
+            Input('covid-toggle', 'on'), Input('covid_count_type', 'value'),
         ]
     )
     def update_plots(
             relayout_data, selected_age,
-            colorscale_name, hospitals_enabled
+            population_enabled, population_colorscale,
+            hospital_enabled, hospital_colorscale,
+            covid_enabled, covid_count_type,
     ):
         global data_3857, data_center_3857, data_4326, data_center_4326
 
         t0 = time.time()
 
-        # Get delayed dataset from client
-        # if gpu_enabled:
         df_d = client.get_dataset('c_df_d')
-        # else:
-        #     df_d = client.get_dataset('pd_df_d')
         df_hospitals = None
+        df_covid = None
+        df_acs2018 = None
 
-        if hospitals_enabled:
+        if covid_count_type == 'Cases/County_population(updated. 2018)':
+            df_acs2018 = client.get_dataset('pd_acs_2018')
+        
+        if hospital_enabled:
             df_hospitals = client.get_dataset('pd_hospitals')
+        
+        if covid_enabled:
+            df_covid = client.get_dataset('pd_covid')
 
         if data_3857 == []:
             projections = delayed(set_projection_bounds)(df_d)
             data_3857, data_center_3857, data_4326, data_center_4326 = projections.compute()
 
         figures_d = delayed(build_updated_figures)(
-            df_d, df_hospitals, relayout_data, selected_age, 'count', colorscale_name
+            df_d, df_hospitals, df_covid, df_acs2018, relayout_data, selected_age, 'count',
+            population_enabled, population_colorscale,
+            hospital_enabled, hospital_colorscale,
+            covid_enabled, covid_count_type,
         )
 
         figures = figures_d.compute()
@@ -900,8 +1052,9 @@ def register_update_plots_callback(client):
 def publish_dataset_to_cluster():
 
     data_path = "../data/census_data_minimized.parquet/*"
-
-    covid_data_path = "https://covidtracking.com/api/states/daily"
+    acs2018_data_path = "../data/acs2018_county_population.parquet"
+    hospital_path = '../data/Hospitals.csv'
+    covid_data_path = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/%s.csv'
     # Note: The creation of a Dask LocalCluster must happen inside the `__main__` block,
     cluster = LocalCUDACluster(CUDA_VISIBLE_DEVICES="0")
     client = Client(cluster)
@@ -913,15 +1066,13 @@ def publish_dataset_to_cluster():
         c_df_d = delayed(load_dataset)(data_path).persist()
         # pandas DataFrame
         pd_df_d = delayed(c_df_d.to_pandas)().persist()
-
         pd_covid = delayed(load_covid)(covid_data_path).persist()
-
-        pd_hospitals = delayed(load_hospitals)(
-            '../data/Hospitals.csv'
-        ).persist()
+        pd_hospitals = delayed(load_hospitals)(hospital_path).persist()
+        c_acs_2018 = delayed(load_dataset(acs2018_data_path)).persist()
+        pd_acs_2018 = delayed(c_acs_2018.to_pandas)().persist()
 
         # Unpublish datasets if present
-        for ds_name in ['pd_df_d', 'c_df_d', 'pd_covid', 'pd_hospitals']:
+        for ds_name in ['pd_df_d', 'c_df_d', 'pd_states_last_5_days', 'pd_states_today', 'pd_hospitals', 'pd_acs_2018']:
             if ds_name in client.datasets:
                 client.unpublish_dataset(ds_name)
 
@@ -929,6 +1080,7 @@ def publish_dataset_to_cluster():
         client.publish_dataset(pd_df_d=pd_df_d)
         client.publish_dataset(c_df_d=c_df_d)
         client.publish_dataset(pd_covid=pd_covid)
+        client.publish_dataset(pd_acs_2018=pd_acs_2018)
         client.publish_dataset(pd_hospitals=pd_hospitals)
 
     load_and_publish_dataset()
@@ -948,6 +1100,7 @@ def publish_dataset_to_cluster():
             client.unpublish_dataset('c_df_d')
             client.unpublish_dataset('pd_covid')
             client.unpublish_dataset('pd_hospitals')
+            client.unpublish_dataset('pd_acs_2018')
             client.restart()
             load_and_publish_dataset()
 
