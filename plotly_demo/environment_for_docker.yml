@@ -1,0 +1,15 @@
+channels:
+  - rapidsai
+  - conda-forge
+  - defaults
+dependencies:
+  - plotly=4.5
+  - dash=1.8
+  - dash-daq=0.3.2
+  - dash_html_components
+  - gunicorn=20.0
+  - requests=2.*
+  - pyproj
+  - pip
+  - pip:
+    - dash-dangerously-set-inner-html
