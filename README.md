@@ -7,7 +7,19 @@ Plotly-RAPIDS Census 2010 Demo
 
 # Steps to reproduce
 
+## Step 1 (Important)
+
+```bash
+cd plotly_demo
+touch .mapbox_token
+```
+Next
+- Create a mapbox token for the demo. Just needs a mapbox account. Can be created for free [here](https://www.mapbox.com/help/define-access-token/)
+- Copy the mapbox_token to the file `plotly_demo/.mapbox_token`
+
 ## Running the plotly demo
+
+### Conda Env
 
 ```bash
 cd plotly_demo
@@ -18,6 +30,15 @@ source activate plotly_env
 python app-covid.py
 ```
 
+### Docker
+
+```bash
+cd plotly_demo
+
+docker build -t plotly_demo .
+docker run --gpus all --rm -it -p 8000:8000 plotly_demo
+#visit http://localhost:8000
+```
 
 ## Dependencies
 
