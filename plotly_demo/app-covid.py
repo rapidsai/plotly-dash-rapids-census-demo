@@ -94,14 +94,17 @@ def load_covid(BASE_URL):
         print('downloading latest covid dataset...')
         for i in range(last_n_days+1):
             date_ = str((datetime.date.today() - datetime.timedelta(days=i+1)).strftime("%m-%d-%Y"))
-            if not os.path.exists('../data/'+date_+'.parquet'):
+            path = '../data/'+date_+'.parquet'
+            if not os.path.exists(path):
                 df_temp.append(
                     pd.read_csv(BASE_URL % date_,
                     usecols=['Lat', 'Long_','Province_State', 'Last_Update', 'Confirmed', 'Deaths', 'Recovered', 'Active', 'Admin2', 'Country_Region', 'Combined_Key']
                 ).query('Country_Region == "US"'))
             else:
+                if os.path.isdir(path):
+                    path = path + '/*'
                 df_temp.append(
-                    cudf.read_parquet('../data/'+date_+'.parquet').to_pandas()
+                    cudf.read_parquet(path).to_pandas()
                 )
                 break
         df = cudf.from_pandas(pd.concat(df_temp).query("Province_State not in ['Wuhan Evacuee','Diamond Princess','Recovered']"))
