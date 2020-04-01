@@ -38,7 +38,7 @@ text_color = "#cfd8dc"  # Material blue-grey 100
 mapbox_land_color = "#343332"
 
 # Figure template
-row_heights = [120, 460, 200, 1600, 300, 90]
+row_heights = [120, 460, 200, 1600, 300, 120]
 template = {
     'layout': {
         'paper_bgcolor': bgcolor,
