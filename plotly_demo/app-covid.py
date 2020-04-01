@@ -106,7 +106,7 @@ def load_covid(BASE_URL):
         df.to_parquet('../data/'+today+'.parquet')
     else:
         print('loading cached latest covid dataset...')
-        df = cudf.read_parquet('../data/'+today+'.parquet')
+        df = cudf.read_parquet('../data/'+today+'.parquet/*')
 
     df_combined_key = df[['Admin2', 'Combined_Key', 'Lat', 'Long_']].dropna()
     df_combined_key.index = df_combined_key.Admin2
