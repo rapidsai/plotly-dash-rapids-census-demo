@@ -1253,5 +1253,3 @@ if __name__ == '__main__':
 
     # Launch dashboard
     app.run_server(debug=False, dev_tools_silence_routes_logging=True, host='0.0.0.0')
-
-my_app = server()
