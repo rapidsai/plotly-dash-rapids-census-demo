@@ -90,7 +90,8 @@ def load_covid(BASE_URL):
     last_n_days = (datetime.date.today() - datetime.date(2020, 3, 25)).days
     today = datetime.date.today().strftime("%m-%d-%Y")
 
-    if not os.path.exists('../data/'+today+'.parquet'):
+    path = '../data/'+today+'.parquet'
+    if not os.path.exists(path):
         print('downloading latest covid dataset...')
         for i in range(last_n_days+1):
             date_ = str((datetime.date.today() - datetime.timedelta(days=i+1)).strftime("%m-%d-%Y"))
@@ -110,8 +111,10 @@ def load_covid(BASE_URL):
         df = cudf.from_pandas(pd.concat(df_temp).query("Province_State not in ['Wuhan Evacuee','Diamond Princess','Recovered']"))
         df.to_parquet('../data/'+today+'.parquet')
     else:
+        if os.path.isdir(path):
+            path = path + '/*'
         print('loading cached latest covid dataset...')
-        df = cudf.read_parquet('../data/'+today+'.parquet/*')
+        df = cudf.read_parquet(path)
 
     df_combined_key = df[['Admin2', 'Combined_Key', 'Lat', 'Long_']].dropna()
     df_combined_key.index = df_combined_key.Admin2
