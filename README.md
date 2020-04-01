@@ -34,7 +34,7 @@ python app-covid.py
 
 ```bash
 docker build -t plotly_demo .
-docker run --gpus all -d -p 8050:8050 plotly_docker
+docker run --gpus all -d -p 8050:8050 plotly_demo
 #Access-> http://localhost:8050 / http://ip_address:8050 / http://0.0.0.0:8050
 ```
 
