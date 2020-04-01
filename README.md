@@ -3,6 +3,7 @@ Plotly-RAPIDS Census 2010 Demo
 ![](./demo.png)
 
 
+![](./demo1.png)
 
 # Steps to reproduce
 
