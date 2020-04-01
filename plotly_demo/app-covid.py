@@ -848,6 +848,7 @@ def build_updated_figures(
         aggregate, population_enabled, population_colorscale,
         hospital_enabled, hospital_colorscale,
         covid_enabled, covid_count_type,
+        data_3857, data_center_3857, data_4326, data_center_4326
 ):
     """
     Build all figures for dashboard
@@ -857,7 +858,6 @@ def build_updated_figures(
         (relayout_data, age_male_histogram, age_female_histogram,
         n_selected_indicator)
     """
-    global data_3857, data_center_3857, data_4326, data_center_4326
 
     colorscale_transform, aggregate_column = 'linear', 'sex'
     selected = {}
@@ -1136,6 +1136,7 @@ def register_update_plots_callback(client):
             population_enabled, population_colorscale,
             hospital_enabled, hospital_colorscale,
             covid_enabled, covid_count_type,
+            data_3857, data_center_3857, data_4326, data_center_4326
         )
 
         figures = figures_d.compute()
@@ -1252,3 +1253,5 @@ if __name__ == '__main__':
 
     # Launch dashboard
     app.run_server(debug=False, dev_tools_silence_routes_logging=True, host='0.0.0.0')
+
+my_app = server()

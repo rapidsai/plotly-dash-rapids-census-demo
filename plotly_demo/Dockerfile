@@ -1,8 +1,6 @@
-ARG CUDA_VERSION=9.2
+ARG CUDA_VERSION=10.2
 ARG LINUX_VERSION=ubuntu16.04
-FROM rapidsai/rapidsai:cuda10.2-runtime-ubuntu16.04
-RUN pwd
-RUN source activate rapids
+FROM rapidsai/rapidsai:cuda${CUDA_VERSION}-runtime-${LINUX_VERSION}
 
 WORKDIR /rapids/
 RUN mkdir covid_demo
@@ -11,4 +9,8 @@ WORKDIR /rapids/covid_demo
 
 COPY . .
 
-RUN conda env update --name rapids --file environment_for_docker.yml
+RUN source activate rapids && conda list
+
+RUN source activate rapids && conda install -c conda-forge --file environment_for_docker.yml && pip install dash-dangerously-set-inner-html
+
+ENTRYPOINT ["bash","./entrypoint.sh"]
