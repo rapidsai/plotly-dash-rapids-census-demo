@@ -2,7 +2,7 @@
 import time
 import os
 import json
-import gzip
+import tarfile
 import shutil
 import requests
 import numpy as np
@@ -76,6 +76,8 @@ def load_dataset(path):
     Returns:
         cudf DataFrame
     """
+    if os.path.isdir(path):
+        path = path + '/*'
     df_d = cudf.read_parquet(path)
     # df_d.sex = df_d.sex.to_pandas().astype('category')
     return df_d
@@ -704,7 +706,7 @@ def build_datashader_plot(
             factor = 'Percentage change since '+yesterday+' = %{text}%'
             sizeref = 10
             marker_border = 21
-        elif covid_count_type == 'Cases/County_population(updated. 2018)':
+        elif covid_count_type == 'Cases/County Population(2018 est) ^4':
             df_covid = df_covid.merge(df_acs2018, on='COUNTY')
             size_markers = df_covid.Confirmed.to_array()
             size_markers = np.around(np.nan_to_num(size_markers/df_covid.acs2018_population.to_array()).astype('float'), 5)
@@ -1116,7 +1118,7 @@ def register_update_plots_callback(client):
         df_covid = None
         df_acs2018 = None
 
-        if covid_count_type == 'Cases/County_population(updated. 2018)':
+        if covid_count_type == 'Cases/County Population(2018 est) ^4':
             df_acs2018 = client.get_dataset('c_acs_2018')
         
         if hospital_enabled:
@@ -1145,11 +1147,40 @@ def register_update_plots_callback(client):
             n_selected_indicator, datashader_plot, age_histogram
         )
 
+def check_dataset(dataset_url, data_path):
+    if not os.path.exists(data_path):
+        print(f"Dataset not found at "+data_path+".\n"
+              f"Downloading from {dataset_url}")
+        # Download dataset to data directory
+        os.makedirs('../data', exist_ok=True)
+        data_gz_path = data_path.split('/*')[0] + '.tar.gz'
+        with requests.get(dataset_url, stream=True) as r:
+            r.raise_for_status()
+            with open(data_gz_path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+
+        print("Decompressing...")
+        f_in = tarfile.open(data_gz_path, 'r:gz')
+        f_in.extractall('../data')
+
+        print("Deleting compressed file...")
+        os.remove(data_gz_path)
+
+        print('done!')
+    else:
+        print(f"Found dataset at {data_path}")
 
 def publish_dataset_to_cluster():
-
-    data_path = "../data/census_data_minimized.parquet/*"
+    census_data_url = 'https://s3.us-east-2.amazonaws.com/rapidsai-data/viz-data/census_data_minimized.parquet.tar.gz'
+    census_data_path = "../data/census_data_minimized.parquet"
+    check_dataset(census_data_url, census_data_path)
+    
+    acs_data_url = 'https://s3.us-east-2.amazonaws.com/rapidsai-data/viz-data/acs2018_county_population.parquet.tar.gz'
     acs2018_data_path = "../data/acs2018_county_population.parquet"
+    check_dataset(acs_data_url, acs2018_data_path)
+
     hospital_path = '../data/Hospitals.csv'
     covid_data_path = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/%s.csv'
     # Note: The creation of a Dask LocalCluster must happen inside the `__main__` block,
@@ -1160,7 +1191,7 @@ def publish_dataset_to_cluster():
     # Load dataset and persist dataset on cluster
     def load_and_publish_dataset():
         # cudf DataFrame
-        c_df_d = delayed(load_dataset)(data_path).persist()
+        c_df_d = delayed(load_dataset)(census_data_path).persist()
         # pandas DataFrame
         pd_df_d = delayed(c_df_d.to_pandas)().persist()
         pd_covid = delayed(load_covid)(covid_data_path).persist()
