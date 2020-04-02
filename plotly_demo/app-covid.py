@@ -122,7 +122,7 @@ def load_covid(BASE_URL):
                     cudf.from_pandas(
                         pd.read_csv(BASE_URL % date_,
                             usecols=['Lat', 'Long_','Province_State', 'Last_Update', 'Confirmed', 'Deaths', 'Country_Region', 'Combined_Key']
-                        ).query('Country_Region == "US"')
+                        ).query('Country_Region == "US" and Confirmed != 0')
                     )
                 )
             else:
@@ -732,14 +732,18 @@ def build_datashader_plot(
             sizeref = 120
             marker_border = 250
         if covid_count_type == '% change since last 2 days':
+            indices = (np.nan_to_num((size_markers - df_covid_yesterday.Confirmed.to_array())/df_covid_yesterday.Confirmed.to_array())).astype('int64')*100
+            df_covid = df_covid.loc[np.where(indices != 0)[0]]
+            df_covid_yesterday = df_covid_yesterday.loc[np.where(indices != 0)[0]]
+            size_markers = np.copy(df_covid.Confirmed.to_array())
+
             size_markers_yesterday = np.copy(df_covid_yesterday.Confirmed.to_array())
             size_markers_yesterday[size_markers_yesterday == 0] = 1
             size_markers = (np.nan_to_num((size_markers - df_covid_yesterday.Confirmed.to_array())/size_markers_yesterday)).astype('int64')*100
             size_markers_labels = np.copy(size_markers)
-            size_markers[size_markers <= 1] = 1
             factor = 'Percentage change since '+yesterday+' = %{text}%'
-            sizeref = 10
-            marker_border = 21
+            sizeref = 100
+            marker_border = 201
         elif covid_count_type == 'Cases/County Population(2018 est) ^4':
             df_covid = df_covid.merge(df_acs2018, on='COUNTY')
             size_markers = df_covid.Confirmed.to_array()
@@ -759,7 +763,7 @@ def build_datashader_plot(
                 'lon': df_covid.Long_.to_array(),
                 'marker': go.scattermapbox.Marker(
                     size=size_markers + marker_border,
-                    sizemin=2,
+                    # sizemin=2,
                     color='black',
                     opacity=0.6,
                     sizeref=sizeref,
