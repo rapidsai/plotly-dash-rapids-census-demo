@@ -1,5 +1,7 @@
 # Census 2010 dataset generation
 
+## Download data
+Download the 2010 Census data from [here](#) (filesize) and the 2010 ACS data from [here](#) (filesizse).
 
 ## Order of execution
 
@@ -13,9 +15,7 @@
 * cow -> class of workers
 
 
-
 ## Mappings:
-
 
 ### Sex
 

@@ -1,23 +1,3 @@
-# Setup 
+# Plot.ly-Dash + RAPIDS | Census 2010 Visualization 
 
-
-```bash
-git clone https://github.com/AjayThorve/plotly_census_2010.git
-cd plotly_census_2010
-mkdir data
-cd data
-#download data from source
-cd ../
-
-conda create -n test_environment
-
-conda update -n test_environment --file environment.yml
- 
-```
-
-
-# Run
-
-```bash
-python app.py
-```
+Refer to the readme in the root directory. 
