@@ -732,7 +732,10 @@ def build_datashader_plot(
             sizeref = 120
             marker_border = 250
         if covid_count_type == '% change since last 2 days':
+            size_markers_yesterday = np.copy(df_covid_yesterday.Confirmed.to_array())
+            size_markers_yesterday[size_markers_yesterday == 0] = 1
             indices = (np.nan_to_num((size_markers - df_covid_yesterday.Confirmed.to_array())/df_covid_yesterday.Confirmed.to_array())).astype('int64')*100
+            
             df_covid = df_covid.loc[np.where(indices != 0)[0]]
             df_covid_yesterday = df_covid_yesterday.loc[np.where(indices != 0)[0]]
             size_markers = np.copy(df_covid.Confirmed.to_array())
