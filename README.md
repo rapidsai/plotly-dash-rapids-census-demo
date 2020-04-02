@@ -1,41 +1,50 @@
-Plotly-RAPIDS Census 2010 Demo
+# Plot.ly-Dash + RAPIDS | Census 2010 | Covid-19 Visualization
 
-![](./demo.png)
+![](./RAPIDS-plotly Census-CV19 v2.png)
 
 
-![](./demo1.png)
+# Installation and Run Steps
 
-# Steps to reproduce
+## Base Layer Setup
+The visualization uses a Mapbox base layer that requires an access token. Create one for free [here](https://www.mapbox.com/help/define-access-token/). Go to the demo root directory `plotly_demo/` and create a token file named `.mapbox_token`. Copy your token contents into the file.
 
-## Step 1 (Important)
+## Running the Visualization App
 
-```bash
-cd plotly_demo
-touch .mapbox_token
-```
-Next
-- Create a mapbox token for the demo. Just needs a mapbox account. Can be created for free [here](https://www.mapbox.com/help/define-access-token/)
-- Copy the mapbox_token to the file `plotly_demo/.mapbox_token`
+You can setup and run the visualization with the conda or docker commands below. Once the app is started, it will look for the datasets locally and if not found will download them.
 
-## Running the plotly demo
+## Data 
+There are 4 main datasets:
+
+- 2010 Census for Population Density (~1.7GB) | download on first run
+- 2018 ACS for County Population (~25KB) | downloaded on first run and included 
+- 2019 HIFLD for Hospital Locations and Beds (~3.8MB) | downloaded on first run and included 
+- Daily JHU CSSE Reports for Covid-19 Cases (~200KB per day) | downloaded every time app is started 
+
+
+For more information on how the Census and ACS data was prepared to show individual points, refer to the [GitHub master Census Demo branch](https://github.com/rapidsai/plotly-dash-rapids-census-demo/tree/master).
 
 ### Conda Env
 
 ```bash
+# setup directory
 cd plotly_demo
 
+# setup conda environment 
 conda env create --name plotly_env --file environment.yml
 source activate plotly_env
 
+# run and access
 python app-covid.py
 ```
 
 ### Docker
 
 ```bash
+# build
 docker build -t plotly_demo .
+
+# run and access via: http://localhost:8050 / http://ip_address:8050 / http://0.0.0.0:8050
 docker run --gpus all -d -p 8050:8050 plotly_demo
-#Access-> http://localhost:8050 / http://ip_address:8050 / http://0.0.0.0:8050
 ```
 
 ## Dependencies
@@ -54,13 +63,46 @@ docker run --gpus all -d -p 8050:8050 plotly_demo
 - pyproj
 
 
-## Acknowledgements
+## FAQ and Known Issues
+*What hardware do I need to run this locally?*
+To run you need an NVIDIA GPU with at least 16GB of memory, and a Linux OS as defined in the [RAPIDS requirements](https://rapids.ai/start.html#req).
 
-- 2010 Population Census and 2018 Population Estimate data used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](www.nhgis.org) ( not for redistribution )
+*How are the population and case counts filtered?*
+Zooming in or out of a region on the map filters the data to that only displayed. Note: because COVID-19 cases are only reported at the county level, we are placing the count bubble at the center of a county boundary. 
+
+*Why is the population data from 2010?*
+Only census data is recorded on . For more details on census boundaries refer to the [TIGERweb app](https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_apps.html). 
+
+*How did you get individual point locations?*
+The population density points are randomly placed within a census block and associated to match distribution counts at a census block level. As such, they are not actual individuals, only a statistical representation of one.
+
+*How did you get hospital beds and locations?*
+This is sourced from the HIFLD data noted below. Some hospital bed counts are unknown and this does not include emergency field hospitals or centers recently activated. 
+
+*How are the bubbles sized?*
+The bubbles are set to a min size and a max size to aid in legibility, and as such are not a direct representation of the data. Hover over for exact counts. 
+
+*How are state COVID-19 counts calculated?*
+State counts are aggregated from the county level. However, as some reports have no county associated with them, the visible county count may not match the state count. 
+
+*Why can't I see a data layer I just toggled?*
+Sometimes the order of the toggle will put a layer under one another, interacting with the map should reset it.
+
+*The dashboard stop responding or the chart data disappeared!*
+Try using the 'clear all selections' button. If that does no work, use the 'reset GPU' button and then refresh the page. This usually resolves any issue. 
+
+*How do I request a feature or report a bug?*
+Create an [Issue](https://github.com/rapidsai/plotly-dash-rapids-census-demo/issues) and we will get to it asap. 
+
+
+## Acknowledgments and Data Sources
+
+- 2010 Population Census and 2018 ACS data used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](www.nhgis.org) ( not for redistribution )
 - Hospital data is from [HIFLD](https://hifld-geoplatform.opendata.arcgis.com/datasets/hospitals) (10/7/2019) and does not contain emergency field hospitals
 - COVID-19 data is from the [Johns Hopkins University](https://coronavirus.jhu.edu/) data on [GitHub](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) (updated daily)
 - Base map layer provided by [mapbox](https://www.mapbox.com/)
 - Dashboard developed with Plot.ly [Dash](https://dash.plotly.com/)
+- Geospatial point rendering developed with [Datashader](https://datashader.org/)
 - GPU accelerated with [RAPIDS](https://rapids.ai/) [cudf](https://github.com/rapidsai/cudf) and [cupy](https://cupy.chainer.org/) libraries
-- For more information reach out on this [Covid-19 Slack Channel](https://join.slack.com/t/rapids-goai/shared_invite/zt-2qmkjvzl-K3rVHb1rZYuFeczoR9e4EA)
+- For more information reach out with this [Covid-19 Slack Channel](https://join.slack.com/t/rapids-goai/shared_invite/zt-2qmkjvzl-K3rVHb1rZYuFeczoR9e4EA)
 - For source code visit our [GitHub](https://github.com/rapidsai/plotly-dash-rapids-census-demo)

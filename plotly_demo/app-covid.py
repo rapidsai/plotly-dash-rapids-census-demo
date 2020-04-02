@@ -220,7 +220,7 @@ app.layout = html.Div(children=[
                 html.Div([
                     dash_dangerously_set_inner_html.DangerouslySetInnerHTML(
                         """
-                        <h4 class='container_title'> Population(2010)<sup>1</sup> | Known Hospital Beds(2019)<sup>2</sup> | Covid Cases (Daily)<sup>3</sup></h4>
+                        <h4 class='container_title'> Population (2010)<sup>1</sup> | Known Hospital Beds (2019)<sup>2</sup> | Covid Cases (Daily)<sup>3</sup></h4>
                         """
                     ),
                 ], className="container_title"),
@@ -311,7 +311,7 @@ app.layout = html.Div(children=[
                                 id='covid_count_type',
                                 options=[
                                     {'label': cs, 'value': cs}
-                                    for cs in ['Total Cases', 'Cases/County Population(2018 est) ^4', '% change since last 2 days']
+                                    for cs in ['Total Cases', 'Case / County Population (2018 ACS)', '% change since last 2 days']
                                 ],
                                 value='Total Cases',
                                 searchable=False,
@@ -395,7 +395,7 @@ app.layout = html.Div(children=[
                     html.Div([
                         dash_dangerously_set_inner_html.DangerouslySetInnerHTML(
                             """
-                                <h4 class='container_title'> Reported COVID Cases (total) and deaths (total) by State <sup>3</sup> </h4>
+                                <h4 class='container_title'> Reported COVID Cases (total) and Deaths (total) by State <sup>3</sup> </h4>
                             """
                         )
                     ], className="container_title"),
@@ -414,15 +414,16 @@ app.layout = html.Div(children=[
     ]),
     html.Div(
         [
-            html.H4('Acknowledgements', style={"margin-top": "0"}),
+            html.H4('Acknowledgments and Data Sources', style={"margin-top": "0"}),
             dcc.Markdown('''
-- ^1 2010 Population Census and ^4 2018 Population Estimate data used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](www.nhgis.org) ( not for redistribution )
-- ^2 Hospital data is from [HIFLD](https://hifld-geoplatform.opendata.arcgis.com/datasets/hospitals) (10/7/2019) and does not contain emergency field hospitals
-- ^3 COVID-19 data is from the [Johns Hopkins University](https://coronavirus.jhu.edu/) data on [GitHub](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) (updated daily)
+- [1] 2010 Population Census and [4] 2018 ACS data used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](www.nhgis.org) ( not for redistribution )
+- [2] Hospital data is from [HIFLD](https://hifld-geoplatform.opendata.arcgis.com/datasets/hospitals) (10/7/2019) and does not contain emergency field hospitals
+- [3] COVID-19 data is from the [Johns Hopkins University](https://coronavirus.jhu.edu/) data on [GitHub](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) (updated daily)
 - Base map layer provided by [mapbox](https://www.mapbox.com/)
 - Dashboard developed with Plot.ly [Dash](https://dash.plotly.com/)
+- Geospatial point rendering developed with [Datashader](https://datashader.org/)
 - GPU accelerated with [RAPIDS](https://rapids.ai/) [cudf](https://github.com/rapidsai/cudf) and [cupy](https://cupy.chainer.org/) libraries
-- For more information reach out on this [Covid-19 Slack Channel](https://join.slack.com/t/rapids-goai/shared_invite/zt-2qmkjvzl-K3rVHb1rZYuFeczoR9e4EA)
+- For more information reach out with this [Covid-19 Slack Channel](https://join.slack.com/t/rapids-goai/shared_invite/zt-2qmkjvzl-K3rVHb1rZYuFeczoR9e4EA)
 - For source code visit our [GitHub](https://github.com/rapidsai/plotly-dash-rapids-census-demo)
 '''),
         ],
