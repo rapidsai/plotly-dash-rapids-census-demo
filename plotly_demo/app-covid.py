@@ -737,8 +737,8 @@ def build_datashader_plot(
             size_markers = (np.nan_to_num((size_markers - df_covid_yesterday.Confirmed.to_array())/size_markers_yesterday)).astype('int64')*100
             size_markers_labels = np.copy(size_markers)
             factor = 'Percentage change since '+yesterday+' = %{text}%'
-            sizeref = 100
-            marker_border = 201
+            sizeref = 15
+            marker_border = 32
         elif covid_count_type == 'Cases/County Population(2018 est) ^4':
             df_covid = df_covid.merge(df_acs2018, on='COUNTY')
             size_markers = df_covid.Confirmed.to_array()
