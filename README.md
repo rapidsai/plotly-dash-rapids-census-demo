@@ -64,42 +64,51 @@ docker run --gpus all -d -p 8050:8050 plotly_demo
 
 
 ## FAQ and Known Issues
-*What hardware do I need to run this locally?*
+*> What hardware do I need to run this locally?*
 
 To run you need an NVIDIA GPU with at least 16GB of memory, and a Linux OS as defined in the [RAPIDS requirements](https://rapids.ai/start.html#req).
+
 
 *How are the population and case counts filtered?*
 
 Zooming in or out of a region on the map filters the data to that only displayed. Note: because COVID-19 cases are only reported at the county level, we are placing the count bubble at the center of a county boundary. 
 
-*Why is the population data from 2010?*
+
+*> Why is the population data from 2010?*
 
 Only census data is recorded on . For more details on census boundaries refer to the [TIGERweb app](https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_apps.html). 
 
-*How did you get individual point locations?*
+
+*> How did you get individual point locations?*
 
 The population density points are randomly placed within a census block and associated to match distribution counts at a census block level. As such, they are not actual individuals, only a statistical representation of one.
 
-*How did you get hospital beds and locations?*
+
+*> How did you get hospital beds and locations?*
 
 This is sourced from the HIFLD data noted below. Some hospital bed counts are unknown and this does not include emergency field hospitals or centers recently activated. 
 
-*How are the bubbles sized?*
+*> How are the bubbles sized?*
 
 The bubbles are set to a min size and a max size to aid in legibility, and as such are not a direct representation of the data. Hover over for exact counts. 
 
-*How are state COVID-19 counts calculated?*
+
+*> How are state COVID-19 counts calculated?*
 
 State counts are aggregated from the county level. However, as some reports have no county associated with them, the visible county count may not match the state count. 
 
-*Why can't I see a data layer I just toggled?*
+
+*> Why can't I see a data layer I just toggled?*
 
 Sometimes the order of the toggle will put a layer under one another, interacting with the map should reset it.
 
-*The dashboard stop responding or the chart data disappeared!*
+*> The dashboard stop responding or the chart data disappeared!*
+
 Try using the 'clear all selections' button. If that does no work, use the 'reset GPU' button and then refresh the page. This usually resolves any issue. 
 
-*How do I request a feature or report a bug?*
+
+*> How do I request a feature or report a bug?*
+
 Create an [Issue](https://github.com/rapidsai/plotly-dash-rapids-census-demo/issues) and we will get to it asap. 
 
 
