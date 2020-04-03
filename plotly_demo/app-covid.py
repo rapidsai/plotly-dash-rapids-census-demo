@@ -158,7 +158,7 @@ def load_covid(BASE_URL):
         }
     ).reset_index()
     df_county = df_county.merge(df_combined_key, on='COUNTY')
-    df_county.Last_Update = pd.to_datetime(df_county.Last_Update.str.split(' ')[0].to_pandas().astype('str'))
+    # df_county.Last_Update = pd.to_datetime(df_county.Last_Update.str.split(' ')[0].to_pandas().astype('str'))
     last_2_days = np.sort(df_county.Last_Update.unique().to_array())[-2:]
     df_count_latest = df_county.query('Last_Update == @last_2_days[-1]').drop_duplicates('COUNTY').reset_index()
     df_count_latest.drop_column('index')
@@ -337,10 +337,10 @@ app.layout = html.Div(children=[
                                 id='covid_count_type',
                                 options=[
                                     {'label': 'Total Cases', 'value': 0},
-                                    {'label': '% change since last 2 days', 'value': 1}
+                                    {'label': '% change since last 2 days', 'value': 1},
                                     {'label': 'Case / County Population (2018 ACS)', 'value': 2},
                                 ],
-                                value='Total Cases',
+                                value=0,
                                 searchable=False,
                                 clearable=False,
                             ), style={'width': '50%', 'height':'15px'}),
