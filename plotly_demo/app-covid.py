@@ -336,8 +336,9 @@ app.layout = html.Div(children=[
                             html.Td(dcc.Dropdown(
                                 id='covid_count_type',
                                 options=[
-                                    {'label': cs, 'value': cs}
-                                    for cs in ['Total Cases', 'Case / County Population (2018 ACS)', '% change since last 2 days']
+                                    {'label': 'Total Cases', 'value': 0},
+                                    {'label': '% change since last 2 days', 'value': 1}
+                                    {'label': 'Case / County Population (2018 ACS)', 'value': 2},
                                 ],
                                 value='Total Cases',
                                 searchable=False,
@@ -727,12 +728,12 @@ def build_datashader_plot(
         size_markers = np.copy(df_covid.Confirmed.to_array())
         size_markers_labels = np.copy(size_markers)
 
-        if covid_count_type == 'Total Cases':
+        if covid_count_type == 0:
             size_markers[size_markers <= 2] = 2
             factor = 'Confirmed Cases as of '+today+' = %{text}'
             sizeref = 120
             marker_border = 250
-        if covid_count_type == '% change since last 2 days':
+        if covid_count_type == 1:
             size_markers_yesterday = np.copy(df_covid_yesterday.Confirmed.to_array())
             size_markers_yesterday[size_markers_yesterday == 0] = 1
             size_markers = (np.nan_to_num((size_markers - df_covid_yesterday.Confirmed.to_array())/size_markers_yesterday)).astype('int64')*100
@@ -740,7 +741,7 @@ def build_datashader_plot(
             factor = 'Percentage change since '+yesterday+' = %{text}%'
             sizeref = 15
             marker_border = 32
-        elif covid_count_type == 'Cases/County Population(2018 est) ^4':
+        elif covid_count_type == 2:
             df_covid = df_covid.merge(df_acs2018, on='COUNTY')
             size_markers = df_covid.Confirmed.to_array()
             size_markers = np.around(np.nan_to_num(size_markers/df_covid.acs2018_population.to_array()).astype('float'), 5)
@@ -1157,7 +1158,7 @@ def register_update_plots_callback(client):
         df_covid = None
         df_acs2018 = None
 
-        if covid_count_type == 'Cases/County Population(2018 est) ^4':
+        if covid_count_type == 2:
             df_acs2018 = client.get_dataset('c_acs_2018')
         
         if hospital_enabled:
