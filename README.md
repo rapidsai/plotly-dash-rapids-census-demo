@@ -39,6 +39,13 @@ python app-covid.py
 
 ### Docker
 
+Verify the following arguments in the Dockerfile match your system:
+
+1. CUDA_VERSION: Supported versions are `10.0, 10.1, 10.2`
+2. LINUX_VERSION: Supported OS values are `ubuntu16.04, ubuntu18.04, centos7`
+
+The most up to date OS and CUDA versions supported can be found here: [RAPIDS requirements](https://rapids.ai/start.html#req)
+
 ```bash
 # build
 docker build -t plotly_demo .
