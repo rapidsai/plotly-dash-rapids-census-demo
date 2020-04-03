@@ -83,12 +83,33 @@ def load_dataset(path):
     return df_d
 
 
+def resolve_missing_counties(df, df_):
+    '''
+        making sure counties reported yesterday and today are consistent in size
+    '''
+    test_df = df.merge(df_, on=['COUNTY'], how='outer', suffixes=['', '_'])
+    df_not_in_today = test_df[test_df.Deaths.isna()]
+    for i in df.columns:
+        if i != 'COUNTY':
+            df_not_in_today[i] = df_not_in_today[str(i)+'_']
+    df_not_in_today = df_not_in_today[df.columns]
+    df = cudf.concat([df, df_not_in_today]).sort_values('COUNTY').reset_index()
+    df_not_in_yesterday = test_df[test_df.Deaths_.isna()]
+    for i in df_.columns:
+        if i == 'Confirmed' or i == 'Deaths':
+            df_not_in_yesterday[str(i)] = 0
+
+    df_not_in_yesterday = df_not_in_yesterday[df_.columns]
+    df_ = cudf.concat([df_, df_not_in_yesterday]).sort_values('COUNTY').reset_index()
+    return df, df_
+
+
 def load_covid(BASE_URL):
     print('loading latest covid dataset...')
     df_temp = []
 
     last_n_days = (datetime.date.today() - datetime.date(2020, 3, 25)).days
-    today = datetime.date.today().strftime("%m-%d-%Y")
+    today = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%m-%d-%Y")
 
     path = '../data/'+today+'.parquet'
     if not os.path.exists(path):
@@ -98,17 +119,20 @@ def load_covid(BASE_URL):
             path = '../data/'+date_+'.parquet'
             if not os.path.exists(path):
                 df_temp.append(
-                    pd.read_csv(BASE_URL % date_,
-                    usecols=['Lat', 'Long_','Province_State', 'Last_Update', 'Confirmed', 'Deaths', 'Recovered', 'Active', 'Admin2', 'Country_Region', 'Combined_Key']
-                ).query('Country_Region == "US"'))
+                    cudf.from_pandas(
+                        pd.read_csv(BASE_URL % date_,
+                            usecols=['Lat', 'Long_','Province_State', 'Last_Update', 'Confirmed', 'Deaths', 'Country_Region', 'Combined_Key']
+                        ).query('Country_Region == "US" and Confirmed != 0')
+                    )
+                )
             else:
                 if os.path.isdir(path):
                     path = path + '/*'
                 df_temp.append(
-                    cudf.read_parquet(path).to_pandas()
+                    cudf.read_parquet(path)
                 )
                 break
-        df = cudf.from_pandas(pd.concat(df_temp).query("Province_State not in ['Wuhan Evacuee','Diamond Princess','Recovered']"))
+        df = cudf.concat(df_temp)
         df.to_parquet('../data/'+today+'.parquet')
     else:
         if os.path.isdir(path):
@@ -116,15 +140,15 @@ def load_covid(BASE_URL):
         print('loading cached latest covid dataset...')
         df = cudf.read_parquet(path)
 
-    df_combined_key = df[['Admin2', 'Combined_Key', 'Lat', 'Long_']].dropna()
-    df_combined_key.index = df_combined_key.Admin2
-    df_combined_key['COUNTY'] = df_combined_key.index
-    df_combined_key.drop('Admin2', axis=1, inplace=True)
+    df_combined_key = df[['Combined_Key', 'Lat', 'Long_']].dropna()
+    df_combined_key.rename({
+        'Combined_Key': 'COUNTY'
+    }, inplace=True)
     df_combined_key.drop_duplicates(inplace=True)
 
     df.Last_Update = pd.to_datetime(df.Last_Update.str.split(' ')[0].to_pandas().astype('str'))
     df.rename({
-        'Admin2': 'COUNTY'
+        'Combined_Key': 'COUNTY'
     }, inplace=True)
     df_states_last_n_days = df.groupby(['Province_State','Last_Update']).sum().reset_index().to_pandas()
     df_county = df.groupby(['COUNTY','Last_Update']).agg(
@@ -134,11 +158,13 @@ def load_covid(BASE_URL):
         }
     ).reset_index()
     df_county = df_county.merge(df_combined_key, on='COUNTY')
+    df_county.Last_Update = pd.to_datetime(df_county.Last_Update.str.split(' ')[0].to_pandas().astype('str'))
     last_2_days = np.sort(df_county.Last_Update.unique().to_array())[-2:]
     df_count_latest = df_county.query('Last_Update == @last_2_days[-1]').drop_duplicates('COUNTY').reset_index()
     df_count_latest.drop_column('index')
     df_count_latest_minus_1 = df_county.query('Last_Update == @last_2_days[0]').drop_duplicates('COUNTY').reset_index()
     df_count_latest_minus_1.drop_column('index')
+    df_count_latest, df_count_latest_minus_1 = resolve_missing_counties(df_count_latest, df_count_latest_minus_1)
     return (df_states_last_n_days, df_count_latest, df_count_latest_minus_1)
 
 def load_hospitals(path):
@@ -707,12 +733,13 @@ def build_datashader_plot(
             sizeref = 120
             marker_border = 250
         if covid_count_type == '% change since last 2 days':
-            size_markers = (np.nan_to_num((size_markers - df_covid_yesterday.Confirmed.to_array())/df_covid_yesterday.Confirmed.to_array())*100).astype('int')
+            size_markers_yesterday = np.copy(df_covid_yesterday.Confirmed.to_array())
+            size_markers_yesterday[size_markers_yesterday == 0] = 1
+            size_markers = (np.nan_to_num((size_markers - df_covid_yesterday.Confirmed.to_array())/size_markers_yesterday)).astype('int64')*100
             size_markers_labels = np.copy(size_markers)
-            size_markers[size_markers <= 1] = 1
             factor = 'Percentage change since '+yesterday+' = %{text}%'
-            sizeref = 10
-            marker_border = 21
+            sizeref = 15
+            marker_border = 32
         elif covid_count_type == 'Cases/County Population(2018 est) ^4':
             df_covid = df_covid.merge(df_acs2018, on='COUNTY')
             size_markers = df_covid.Confirmed.to_array()
@@ -732,7 +759,7 @@ def build_datashader_plot(
                 'lon': df_covid.Long_.to_array(),
                 'marker': go.scattermapbox.Marker(
                     size=size_markers + marker_border,
-                    sizemin=2,
+                    # sizemin=2,
                     color='black',
                     opacity=0.6,
                     sizeref=sizeref,
@@ -755,7 +782,7 @@ def build_datashader_plot(
                     '<b>%{hovertext}</b><br><br>'+factor+'<extra></extra>'
                 ),
                 'text': size_markers_labels,
-                'hovertext': df_covid.Combined_Key,
+                'hovertext': df_covid.COUNTY,
                 'mode': 'markers',
                 'showlegend': False,
                 'subplot': 'mapbox'
@@ -1040,9 +1067,14 @@ def build_updated_figures(
 
 def generate_covid_bar_plots(df, scale_covid, category_covid):
     df = df[0]
-    fig = make_subplots(rows=12, cols=5, subplot_titles=df.Province_State.unique().tolist(),)
+    states = df.Province_State.unique().tolist()
+    for rem_state in ['Wuhan Evacuee','Diamond Princess','Recovered', 'Grand Princess']:
+        if rem_state in states:
+            states.remove(rem_state)
+
+    fig = make_subplots(rows=12, cols=5, subplot_titles=states)
     index = 0
-    for state in df.Province_State.unique().tolist():
+    for state in states:
         df_temp = df.query('Province_State == @state')
         if(category_covid == 'Total cases'):
             fig.add_trace(go.Scatter(x=df_temp.Last_Update, y=df_temp.Confirmed, name='Confirmed', marker=dict(color='#c724e5'), hoverinfo='text', hovertemplate='Confirmed=%{text}<extra></extra>', text=df_temp.Confirmed), row=int(index/5) + 1, col=int(index%5)+1)
@@ -1185,9 +1217,7 @@ def publish_dataset_to_cluster():
     census_data_path = "../data/census_data_minimized.parquet"
     check_dataset(census_data_url, census_data_path)
     
-    acs_data_url = 'https://s3.us-east-2.amazonaws.com/rapidsai-data/viz-data/acs2018_county_population.parquet.tar.gz'
     acs2018_data_path = "../data/acs2018_county_population.parquet"
-    check_dataset(acs_data_url, acs2018_data_path)
 
     hospital_path = '../data/Hospitals.csv'
     covid_data_path = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/%s.csv'
