@@ -3,7 +3,7 @@
 ![](./demo.png)
 
 
-# Installation and Run Steps
+# Installation and Run Steps [Work In Progress]
 
 ## Base Layer Setup
 The visualization uses a Mapbox base layer that requires an access token. Create one for free [here](https://www.mapbox.com/help/define-access-token/). Go to the demo root directory `plotly_demo/` and create a token file named `.mapbox_token`. Copy your token contents into the file.
