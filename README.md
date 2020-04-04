@@ -15,9 +15,7 @@ You can setup and run the visualization with the conda or docker commands below.
 ## Data 
 There are 2 main datasets:
 
-- 2010 Census for Population Density (FILL OUT) 
-- 2018 ACS for Attributes (FILL OUT)
-
+- 2010 Census for Population Density (~2.9 GB) | download on first run
 
 For more information on how the Census and ACS data was prepared to show individual points, refer to the `/data_prep` folder.
 

@@ -2,7 +2,7 @@
 import time
 import os
 import json
-import gzip
+import tarfile
 import shutil
 import requests
 import numpy as np
@@ -209,7 +209,8 @@ def load_dataset(path):
         pandas DataFrame
     """
     df_d = cudf.read_parquet(path)
-    df_d.sex = df_d.sex.to_pandas().astype('category')
+    df_d['sex'] = df_d.sex.to_pandas().astype('category')
+    print(df_d.dtypes)
     return df_d
 
 
@@ -587,11 +588,13 @@ def build_datashader_plot(
         if not isinstance(df, cudf.DataFrame):
             df[aggregate_column] = df[aggregate_column].astype('int8')
 
+    print(df.dtypes)
     cvs = ds.Canvas(
         plot_width=1400,
         plot_height=1400,
         x_range=x_range, y_range=y_range
     )
+    
     agg = cvs.points(
         df, x='x', y='y', agg=getattr(ds, aggregate)(aggregate_column)
     )
@@ -1019,7 +1022,7 @@ def build_updated_figures(
                 'font': {
                     'color': text_color
                 },
-                "valueformat": ".0f"
+                "valueformat": ","
             }
         }],
         'layout': {
@@ -1122,10 +1125,37 @@ def register_update_plots_callback(client):
             n_selected_indicator, datashader_plot, age_histogram, scatter_graph
         )
 
+def check_dataset(dataset_url, data_path):
+    if not os.path.exists(data_path):
+        print(f"Dataset not found at "+data_path+".\n"
+              f"Downloading from {dataset_url}")
+        # Download dataset to data directory
+        os.makedirs('../data', exist_ok=True)
+        data_gz_path = data_path.split('/*')[0] + '.tar.gz'
+        with requests.get(dataset_url, stream=True) as r:
+            r.raise_for_status()
+            with open(data_gz_path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+
+        print("Decompressing...")
+        f_in = tarfile.open(data_gz_path, 'r:gz')
+        f_in.extractall('../data')
+
+        print("Deleting compressed file...")
+        os.remove(data_gz_path)
+
+        print('done!')
+    else:
+        print(f"Found dataset at {data_path}")
+
 
 def publish_dataset_to_cluster():
 
-    data_path = "/home/ajay/new_dev/plotly/census_large/data/census_data_epsg_3857.parquet/*"
+    census_data_url = 'https://s3.us-east-2.amazonaws.com/rapidsai-data/viz-data/census_data.parquet.tar.gz'
+    data_path = "../data/census_data.parquet/*"
+    check_dataset(census_data_url, data_path)
 
     # Note: The creation of a Dask LocalCluster must happen inside the `__main__` block,
     cluster = LocalCUDACluster(CUDA_VISIBLE_DEVICES="0")
