@@ -1,7 +1,7 @@
 # Plot.ly-Dash + RAPIDS | Census 2010 Visualization
 
 ![](./demo.png)
-
+![](./demo2.png)
 
 # Installation and Run Steps [Work In Progress]
 
@@ -33,6 +33,23 @@ source activate plotly_env
 python app.py
 ```
 
+
+### Docker
+
+Verify the following arguments in the Dockerfile match your system:
+
+1. CUDA_VERSION: Supported versions are `10.0, 10.1, 10.2`
+2. LINUX_VERSION: Supported OS values are `ubuntu16.04, ubuntu18.04, centos7`
+
+The most up to date OS and CUDA versions supported can be found here: [RAPIDS requirements](https://rapids.ai/start.html#req)
+
+```bash
+# build
+docker build -t plotly_demo .
+
+# run and access via: http://localhost:8050 / http://ip_address:8050 / http://0.0.0.0:8050
+docker run --gpus all -d -p 8050:8050 plotly_demo
+```
 
 ## Dependencies
 

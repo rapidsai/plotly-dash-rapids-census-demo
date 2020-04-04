@@ -208,9 +208,10 @@ def load_dataset(path):
     Returns:
         pandas DataFrame
     """
+    if os.path.isdir(path):
+        path = path + '/*'
     df_d = cudf.read_parquet(path)
     df_d['sex'] = df_d.sex.to_pandas().astype('category')
-    print(df_d.dtypes)
     return df_d
 
 
@@ -588,7 +589,6 @@ def build_datashader_plot(
         if not isinstance(df, cudf.DataFrame):
             df[aggregate_column] = df[aggregate_column].astype('int8')
 
-    print(df.dtypes)
     cvs = ds.Canvas(
         plot_width=1400,
         plot_height=1400,
@@ -1154,7 +1154,7 @@ def check_dataset(dataset_url, data_path):
 def publish_dataset_to_cluster():
 
     census_data_url = 'https://s3.us-east-2.amazonaws.com/rapidsai-data/viz-data/census_data.parquet.tar.gz'
-    data_path = "../data/census_data.parquet/*"
+    data_path = "../data/census_data.parquet"
     check_dataset(census_data_url, data_path)
 
     # Note: The creation of a Dask LocalCluster must happen inside the `__main__` block,
