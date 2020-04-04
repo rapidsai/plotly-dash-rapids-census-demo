@@ -1,88 +1,67 @@
 # Census 2010 dataset generation
 
-## Download data
-Download the 2010 Census data from [here](#) (filesize) and the 2010 ACS data from [here](#) (filesizse).
+The census_data we prepared for this demo is basically a compilation and estimation of 3 datasets:
+1. Census 2010 sf1 
+2. Acs_2006_2010
+3. Shape files(tiger) from 2010
 
-## Order of execution
-
-1. add_gender_to_dataset
-2. add_age_to_dataset
-3. add_education_to_dataset
-4. add_income_to_dataset
-5. add_cow_to_dataset
-
-
-* cow -> class of workers
-
-
-## Mappings:
-
-### Sex
-
-Male - 0
-Female - 0
-
-
-### Age
-
-integer
-
-
-### Education
-
-<b>0</b>:     No schooling completed</br>
-<b>1</b>:     Nursery to 4th grade</br>
-<b>2</b>:     5th and 6th grade</br>
-<b>3</b>:     7th and 8th grade</br>
-<b>4</b>:     9th grade</br>
-<b>5</b>:     10th grade</br>
-<b>6</b>:     11th grade</br>
-<b>7</b>:     12th grade, no diploma</br>
-<b>8</b>:     High school graduate, GED, or alternative</br>
-<b>9</b>:     Some college, less than 1 year</br>
-<b>10</b>:    Some college, 1 or more years, no degree</br>
-<b>11</b>:    Associate's degree</br>
-<b>12</b>:    Bachelor's degree</br>
-<b>13</b>:    Master's degree</br>
-<b>14</b>:    Professional school degree</br>
-<b>15</b>:    Doctorate degree</br>
-
-
-
-# Class of Workers(cow)
-
-<b>0</b>: Private for-profit wage and salary workers: Employee of private company workers</br>
-<b>1</b>: Private for-profit wage and salary workers: Self-employed in own incorporated business workers</br>
-<b>2</b>: Private not-for-profit wage and salary workers</br>
-<b>3</b>: Local government workers</br>
-<b>4</b>: State government workers</br>
-<b>5</b>: Federal government workers</br>
-<b>6</b>: Self-employed in own not incorporated business workers</br>
-<b>7</b>: Unpaid family workers</br> 
-<b>8</b>: Data not available/under 16 years
-
-
-# Income
-
-<b>0</b>:  `$1 to $2,499 or loss`<br/>
-<b>1</b>:  `$2,500 to $4,999`<br/>
-<b>2</b>:  `$5,000 to $7,499` <br/>
-<b>3</b>:  `$7,500 to $9,999`   <br/>
-<b>4</b>:  `$10,000 to $12,499`   <br/>
-<b>5</b>:  `$12,500 to $14,999`   <br/>
-<b>6</b>:  `$15,000 to $17,499`   <br/>
-<b>7</b>:  `$17,500 to $19,999`   <br/>
-<b>8</b>:  `$20,000 to $22,499`   <br/>
-<b>9</b>:  `$22,500 to $24,999`  <br/>
-<b>10</b>: `$25,000 to $29,999`  <br/>
-<b>11</b>: `$30,000 to $34,999`   <br/>
-<b>12</b>: `$35,000 to $39,999`   <br/>
-<b>13</b>: `$40,000 to $44,999`   <br/>
-<b>14</b>: `$45,000 to $49,999`   <br/>
-<b>15</b>: `$50,000 to $54,999`<br/>
-<b>16</b>: `$55,000 to $64,999`<br/>
-<b>17</b>: `$65,000 to $74,999`<br/>
-<b>18</b>: `$75,000 to $99,999`<br/>
-<b>19</b>:`$100,000 or more `<br/>
-<b>20</b>: No data available/ below 16 years<br/>
+Steps we follow to compile and estimate:
+ - Take the block wise population from 2010 sf1 dataset
+ - Assign random lat-longs (accurate within a block) using polygons from shape files
+ - Results in a dataset with person_id, lat, long, Block_id
+ - Take Block-group level estimates of age, sex, income and education from acs dataset, and distribute them for each block 
  
+ > Note: IMPORTANT: We assume block-group level estimates for individual blocks, which may not result in the most accurate estimates of age, income, education and sex distributions. This is intended for demonstration of the viz libraries only
+
+
+The final dataset can be downloaded [here](https://s3.us-east-2.amazonaws.com/rapidsai-data/viz-data/census_data.parquet.tar.gz)
+
+
+However, if you want to recreate the dataset yourself, please follow the following steps:
+
+## Step 1: Download initial data
+
+Go to nhgis data finder and use the following filters
+
+### 1. Total Population (2010 Block)
+    Filters: 
+
+    Geographic Levels: BLOCK
+    YEARS: 2010
+
+    Final File: P1. Total Population |	Total population |		2010_SF1a |	Spatial
+
+### 2. Shape files
+    Filters:
+
+    Geographic Levels: BLOCK
+    YEARS: 2010
+
+    Final File: Select all 52 GIS files
+
+### 3. ACS 2010 distributions
+    Filters:
+
+    Geographic Levels: BLCK_GRP
+    YEARS: 2006-2010
+    TOPICS: Age or Sex or Educational Attainment or Class of Worker or Personal Income
+
+    Select the following files:
+    - B01001. Sex by Age
+    - B15002. Sex by Educational Attainment for the Population 25 Years and Over
+    - B20001. Sex by Earnings in the Past 12 Months (in 2010 Inflation-Adjusted Dollars) for the Population 16 Years and Over with Earnings in the Past 12 Months
+    - B24080. Sex by Class of Worker for the Civilian Employed Population 16 Years and Over
+
+    Year-DATASET: 2006_2010_ACS5a
+
+
+## Step 2: Execute scripts in the following order
+
+1. data_set_prep_concat_states
+    - gen_points_script.py (takes around 24 hours to finish execution - assign each of 300+M people a lat and long as per shape files)
+    - concat_states.ipynb
+2. add_gender_to_dataset
+3. add_age_to_dataset
+4. add_education_to_dataset
+5. add_income_to_dataset
+6. add_cow_to_dataset (cow -> class of workers)
