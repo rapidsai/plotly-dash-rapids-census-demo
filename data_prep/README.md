@@ -11,7 +11,7 @@ Steps we follow to compile and estimate:
  - Results in a dataset with person_id, lat, long, Block_id
  - Take Block-group level estimates of age, sex, income and education from acs dataset, and distribute them for each block 
  
- > Note: IMPORTANT: We assume block-group level estimates for individual blocks, which may not result in the most accurate estimates of age, income, education and sex distributions. This is intended for demonstration of the viz libraries only
+ > IMPORTANT: We assume block-group level estimates for individual blocks, which may not result in the most accurate estimates of age, income, education and sex distributions. This is intended for demonstration of the viz libraries only
 
 
 The final dataset can be downloaded [here](https://s3.us-east-2.amazonaws.com/rapidsai-data/viz-data/census_data.parquet.tar.gz)
