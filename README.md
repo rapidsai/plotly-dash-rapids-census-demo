@@ -13,7 +13,7 @@ The visualization uses a Mapbox base layer that requires an access token. Create
 You can setup and run the visualization with the conda or docker commands below. Once the app is started, it will look for the datasets locally and if not found will download them.
 
 ## Data 
-There are 2 main datasets:
+There is 1 main dataset:
 
 - 2010 Census for Population Density (~2.9 GB) | download on first run
 
