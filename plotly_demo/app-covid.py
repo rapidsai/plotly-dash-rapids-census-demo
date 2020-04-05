@@ -17,7 +17,7 @@ from dash.dependencies import Input, Output
 import dash_daq as daq
 from plotly.colors import sequential
 from pyproj import Transformer
-
+import dask_cudf
 from dask import delayed
 from distributed import Client
 from dask_cuda import LocalCUDACluster
@@ -52,7 +52,10 @@ template = {
 }
 
 
-colors = {}
+colors = {
+    'age': ['#C700E5','#9D00DB', '#7300D2','#4900C8','#1F00BF'],
+    # 'age': ['red','green', 'blue','orange']
+}
 mappings = {}
 
 # Load mapbox token from environment variable or file
@@ -63,7 +66,7 @@ if not token:
 
 # Names of float columns
 float_columns = [
-    'x', 'y', 'age'
+    'x', 'y'
 ]
 cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4 = None, None, None, None
 data_center_3857, data_3857, data_4326, data_center_4326 = [], [], [], []
@@ -79,7 +82,20 @@ def load_dataset(path):
     if os.path.isdir(path):
         path = path + '/*'
     df_d = cudf.read_parquet(path)
-    # df_d.sex = df_d.sex.to_pandas().astype('category')
+    if 'age' in df_d.columns:
+        df_d.drop_column('sex')
+        # df_d.drop_column('age')
+    # df_d = df_d.head(220_000_000)
+        df_d['age'][df_d['age']<=20] = 1
+        mask_ = (df_d['age']>20) & (df_d['age']<=40)
+        df_d['age'][mask_] = 2
+        mask_ = (df_d['age']>40) & (df_d['age']<=50)
+        df_d['age'][mask_] = 3
+        mask_ = (df_d['age']>50) & (df_d['age']<=60)
+        df_d['age'][mask_] = 4
+        del(mask_)
+        df_d['age'][df_d['age']>60] = 5
+        df_d['age'] = df_d.age.to_pandas().astype('category')
     return df_d
 
 
@@ -160,10 +176,8 @@ def load_covid(BASE_URL):
     df_county = df_county.merge(df_combined_key, on='COUNTY')
     df_county.Last_Update = pd.to_datetime(df_county.Last_Update.str.split(' ')[0].to_pandas().astype('str'))
     last_2_days = np.sort(df_county.Last_Update.unique().to_array())[-2:]
-    df_count_latest = df_county.query('Last_Update == @last_2_days[-1]').drop_duplicates('COUNTY').reset_index()
-    df_count_latest.drop_column('index')
-    df_count_latest_minus_1 = df_county.query('Last_Update == @last_2_days[0]').drop_duplicates('COUNTY').reset_index()
-    df_count_latest_minus_1.drop_column('index')
+    df_count_latest = df_county.query('Last_Update == @last_2_days[-1]').drop_duplicates('COUNTY').reset_index(drop=True)
+    df_count_latest_minus_1 = df_county.query('Last_Update == @last_2_days[0]').drop_duplicates('COUNTY').reset_index(drop=True)
     df_count_latest, df_count_latest_minus_1 = resolve_missing_counties(df_count_latest, df_count_latest_minus_1)
     return (df_states_last_n_days, df_count_latest, df_count_latest_minus_1)
 
@@ -284,15 +298,15 @@ app.layout = html.Div(children=[
                                 id='population-toggle',
                             ))),
                             html.Td(
-                                html.Div("Color Scale"), className="config-label"
+                                html.Div("Total by"), className="config-label"
                             ),
                             html.Td(dcc.Dropdown(
                                 id='colorscale-dropdown-population',
                                 options=[
-                                    {'label': cs, 'value': cs}
-                                    for cs in ['Viridis', 'Cividis', 'Inferno', 'Magma', 'Plasma']
+                                    {'label': 'Age by '+cs if cs == 'Purblue' else 'Total by '+cs, 'value': cs}
+                                    for cs in ['Purblue', 'Viridis', 'Cividis', 'Inferno', 'Magma', 'Plasma']
                                 ],
-                                value='Viridis',
+                                value='Purblue',
                                 searchable=False,
                                 clearable=False,
                             ), style={'width': '50%', 'height':'15px'}),
@@ -373,30 +387,6 @@ app.layout = html.Div(children=[
             html.Div(
                 children=[
                     html.Button(
-                        "Clear Selection", id='clear-age', className='reset-button'
-                    ),
-                    html.Div([
-                        dash_dangerously_set_inner_html.DangerouslySetInnerHTML(
-                        """
-                            <h4 class='container_title'> Population by Age (2010)<sup>1</sup> | Select to filter </h4>
-                        """
-                        )
-                    ], className="container_title"),
-
-                    dcc.Graph(
-                        id='age-histogram',
-                        config={'displayModeBar': False},
-                        figure=blank_fig(row_heights[4]),
-                        animate=True
-                    ),
-                ],
-                className='twelve columns pretty_container', id="age-div"
-            )
-        ]),
-        html.Div(children=[
-            html.Div(
-                children=[
-                    html.Button(
                         "Clear Selection", id='clear-covid', className='reset-button'
                     ),
                     html.Div(dcc.Dropdown(
@@ -470,14 +460,6 @@ app.layout = html.Div(children=[
 )
 def clear_map(*args):
     return None
-
-@app.callback(
-    Output('age-histogram', 'selectedData'),
-    [Input('clear-age', 'n_clicks'), Input('clear-all', 'n_clicks')]
-)
-def clear_age_hist_selections(*args):
-    return None
-
 
 @app.callback(
     Output('covid-histogram', 'selectedData'),
@@ -608,9 +590,12 @@ def build_datashader_plot(
         query_expr_xy = f"(x >= {x0}) & (x <= {x1}) & (y >= {y0}) & (y <= {y1})"
         datashader_color_scale = {}
 
-        if aggregate == 'count_cat':
+        if population_colorscale == 'Purblue':
+            aggregate_column = 'age'
             datashader_color_scale['color_key'] = colors[aggregate_column] 
         else:
+            aggregate_column = 'x'
+            aggregate = 'count'
             datashader_color_scale['cmap'] = [i[1] for i in build_colorscale(population_colorscale, colorscale_transform, aggregate, aggregate_column)]
             if not isinstance(df, cudf.DataFrame):
                 df[aggregate_column] = df[aggregate_column].astype('int8')
@@ -659,14 +644,35 @@ def build_datashader_plot(
             lat = [None]
             lon = [None]
             customdata = [None]
+        
+        
+        if aggregate == 'count_cat':
+            marker = dict(
+                    size=0,
+                    showscale=True,
+                    colorscale=[
+                        (0.0, 'rgb(198, 0, 229)'),
+                        (0.25, 'rgb(157, 0, 219)'),
+                        (0.50, 'rgb(115, 0, 210)'),
+                        (0.75, 'rgb(73, 0, 200)'),
+                        (1.0, 'rgb(31, 0, 191)'),
+                    ],
+                    name='Age',
+                    cmin=0,
+                    cmax=65,
+                )
 
-        # Build map figure
-        map_graph['data'].append(
-            {
-                'type': 'scattermapbox',
-                'lat': lat, 'lon': lon,
-                'customdata': customdata,
-                'marker': dict(
+            map_graph['data'].append(
+                {
+                    'type': 'scattermapbox',
+                    'lat': lat, 'lon': lon,
+                    'customdata': customdata,
+                    'marker': marker,
+                    'hoverinfo': 'none'
+                }
+            )
+        else:
+            marker = dict(
                     size=0,
                     showscale=True,
                     colorscale=build_colorscale(
@@ -675,10 +681,18 @@ def build_datashader_plot(
                     ),
                     cmin=cmin,
                     cmax=cmax
-                ),
-                'hoverinfo': 'none'
-            }
-        )
+                )
+            map_graph['data'].append(
+                {
+                    'type': 'scattermapbox',
+                    'lat': lat, 'lon': lon,
+                    'customdata': customdata,
+                    'marker': marker,
+                    'hoverinfo': 'none'
+                }
+            )
+        # Build map figure
+        
 
         map_graph['layout']['mapbox'].update({'layers': layers})
     map_graph['layout']['mapbox'].update(position)
@@ -877,9 +891,13 @@ def build_histogram_default_bins(
 
     return fig
 
+def _custom_reset_index(df):
+    #reduces gpu usage by around 2GB
+    df.index = cudf.core.RangeIndex(0, len(df), name=df.index)
+    return df
 
 def build_updated_figures(
-        df, df_hospitals, df_covid, df_acs2018, relayout_data, selected_age,
+        df, df_hospitals, df_covid, df_acs2018, relayout_data,
         aggregate, population_enabled, population_colorscale,
         hospital_enabled, hospital_colorscale,
         covid_enabled, covid_count_type,
@@ -894,15 +912,7 @@ def build_updated_figures(
         n_selected_indicator)
     """
 
-    colorscale_transform, aggregate_column = 'linear', 'sex'
-    selected = {}
-
-    if selected_age:
-        selected = {
-            'age': bar_selection_to_query(selected_age, 'age')
-        }
-
-    all_hists_query = build_query(selected)
+    colorscale_transform, aggregate_column = 'linear', 'age'
 
     drop_down_queries = ''
 
@@ -952,11 +962,18 @@ def build_updated_figures(
     y0, y1 = y_range
 
     # Build query expressions
-    query_expr_xy = f"(x >= {x0}) & (x <= {x1}) & (y >= {y0}) & (y <= {y1})"
-    df_map = df.query(query_expr_xy)
 
+    mask_ = (df['x']>=x0) & (df['x']<=x1) & (df['y']>=y0) & (df['y']<=y1)
+    if(mask_.sum() != len(df)):
+        df_map = df[mask_]
+        df_map.index = cudf.core.RangeIndex(0,len(df_map))
+    else:
+        df_map = df
+    
+    del(mask_)
+    
     datashader_plot = build_datashader_plot(
-        df.query(all_hists_query) if all_hists_query else df, aggregate,
+        df, aggregate,
         aggregate_column, new_coordinates, position, x_range, y_range,
         df_hospitals, df_covid, df_acs2018, population_enabled, population_colorscale,
         hospital_enabled, hospital_colorscale,
@@ -964,14 +981,14 @@ def build_updated_figures(
         colorscale_transform
     )
 
-    df_hists = df_map.query(all_hists_query) if all_hists_query else df_map
+
     # Build indicator figure
     n_selected_indicator = {
         'data': [{
             'title': {"text": "Visible Population"},
             'type': 'indicator',
             'value': len(
-                df_hists
+                df_map
             ),
             'number': {
                 'font': {
@@ -996,7 +1013,7 @@ def build_updated_figures(
         x0, x1 = x_range
         y0, y1 = y_range
         query_expr_xy_hosp = f"(Long_ >= {x0}) & (Long_ <= {x1}) & (Lat >= {y0}) & (Lat <= {y1})"
-        df_covid = df_covid[1].query(query_expr_xy_hosp)
+        df_covid = df_covid[1].query(query_expr_xy_hosp).reset_index(drop=True)
         n_selected_indicator['data'].append({
             'title': {"text": "Visible Total Cases"},
             'type': 'indicator',
@@ -1025,7 +1042,7 @@ def build_updated_figures(
         x0, x1 = x_range
         y0, y1 = y_range
         query_expr_xy_hosp = f"(X >= {x0}) & (X <= {x1}) & (Y >= {y0}) & (Y <= {y1})"
-        df_hospitals = df_hospitals.query(query_expr_xy_hosp)
+        df_hospitals = df_hospitals.query(query_expr_xy_hosp).reset_index(drop=True)
         n_selected_indicator['data'].append({
             'title': {"text": "Known Hopital Beds"},
             'type': 'indicator',
@@ -1042,7 +1059,7 @@ def build_updated_figures(
         n_selected_indicator['data'].append({
             'title': {"text": "People to Beds"},
             'type': 'indicator',
-            'value': round(len(df_hists)/df_hospitals.BEDS.sum()),
+            'value': round(len(df_map)/df_hospitals.BEDS.sum()),
             'domain': domain_2,
             'number': {
                 'font': {
@@ -1055,16 +1072,7 @@ def build_updated_figures(
 
     query_cache = {}
 
-    if isinstance(df_map, cudf.DataFrame):
-        df_map = df_map.groupby('age')['x'].count().to_pandas()
-    else:
-        df_map = df_map.groupby('age')['x'].count()
-
-    age_histogram = build_histogram_default_bins(
-        df_map, 'age', selected, query_cache, 'v'
-    )
-
-    return (datashader_plot, age_histogram, n_selected_indicator)
+    return (datashader_plot, n_selected_indicator)
 
 def generate_covid_bar_plots(df, scale_covid, category_covid):
     df = df[0]
@@ -1076,7 +1084,7 @@ def generate_covid_bar_plots(df, scale_covid, category_covid):
     fig = make_subplots(rows=12, cols=5, subplot_titles=states)
     index = 0
     for state in states:
-        df_temp = df.query('Province_State == @state')
+        df_temp = df.query('Province_State == @state').reset_index(drop=True)
         if(category_covid == 'Total cases'):
             fig.add_trace(go.Scatter(x=df_temp.Last_Update, y=df_temp.Confirmed, name='Confirmed', marker=dict(color='#c724e5'), hoverinfo='text', hovertemplate='Confirmed=%{text}<extra></extra>', text=df_temp.Confirmed), row=int(index/5) + 1, col=int(index%5)+1)
         else:
@@ -1135,16 +1143,15 @@ def register_update_plots_callback(client):
     """
     @app.callback(
         [Output('indicator-graph', 'figure'), Output('map-graph', 'figure'),
-         Output('age-histogram', 'figure')
          ],
-        [Input('map-graph', 'relayoutData'), Input('age-histogram', 'selectedData'),
+        [Input('map-graph', 'relayoutData'),
             Input('population-toggle', 'on'), Input('colorscale-dropdown-population', 'value'), 
             Input('hospital-toggle', 'on'), Input('colorscale-dropdown-hospital', 'value'),
             Input('covid-toggle', 'on'), Input('covid_count_type', 'value'),
         ]
     )
     def update_plots(
-            relayout_data, selected_age,
+            relayout_data,
             population_enabled, population_colorscale,
             hospital_enabled, hospital_colorscale,
             covid_enabled, covid_count_type,
@@ -1172,7 +1179,7 @@ def register_update_plots_callback(client):
             data_3857, data_center_3857, data_4326, data_center_4326 = projections.compute()
 
         figures_d = delayed(build_updated_figures)(
-            df_d, df_hospitals, df_covid, df_acs2018, relayout_data, selected_age, 'count',
+            df_d, df_hospitals, df_covid, df_acs2018, relayout_data, 'count_cat',
             population_enabled, population_colorscale,
             hospital_enabled, hospital_colorscale,
             covid_enabled, covid_count_type,
@@ -1181,11 +1188,11 @@ def register_update_plots_callback(client):
 
         figures = figures_d.compute()
 
-        (datashader_plot, age_histogram, n_selected_indicator) = figures
+        (datashader_plot, n_selected_indicator) = figures
 
         print(f"Update time: {time.time() - t0}")
         return (
-            n_selected_indicator, datashader_plot, age_histogram
+            n_selected_indicator, datashader_plot
         )
 
 def check_dataset(dataset_url, data_path):
@@ -1232,7 +1239,7 @@ def publish_dataset_to_cluster():
         # cudf DataFrame
         c_df_d = delayed(load_dataset)(census_data_path).persist()
         # pandas DataFrame
-        pd_df_d = delayed(c_df_d.to_pandas)().persist()
+        # pd_df_d = delayed(c_df_d.to_pandas)().persist()
         pd_covid = delayed(load_covid)(covid_data_path).persist()
         pd_hospitals = delayed(load_hospitals)(hospital_path).persist()
         c_acs_2018 = delayed(load_dataset(acs2018_data_path)).persist()
@@ -1243,7 +1250,7 @@ def publish_dataset_to_cluster():
                 client.unpublish_dataset(ds_name)
 
         # Publish datasets to the cluster
-        client.publish_dataset(pd_df_d=pd_df_d)
+        # client.publish_dataset(pd_df_d=pd_df_d)
         client.publish_dataset(c_df_d=c_df_d)
         client.publish_dataset(pd_covid=pd_covid)
         client.publish_dataset(c_acs_2018=c_acs_2018)
@@ -1266,7 +1273,7 @@ def publish_dataset_to_cluster():
         if n_clicks:
             print("Restarting LocalCUDACluster")
             cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4 = None, None, None, None
-            client.unpublish_dataset('pd_df_d')
+            # client.unpublish_dataset('pd_df_d')
             client.unpublish_dataset('c_df_d')
             client.unpublish_dataset('pd_covid')
             client.unpublish_dataset('pd_hospitals')
