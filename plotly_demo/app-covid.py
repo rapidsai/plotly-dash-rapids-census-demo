@@ -36,6 +36,7 @@ cupy.cuda.set_allocator(None)
 bgcolor = "#191a1a"  # mapbox dark map land color
 text_color = "#cfd8dc"  # Material blue-grey 100
 mapbox_land_color = "#343332"
+covid_last_update_time = time.time()
 
 # Figure template
 row_heights = [120, 460, 200, 1600, 300, 120]
@@ -50,7 +51,6 @@ template = {
         'yaxis': {'showgrid': True, 'automargin': True, 'gridcolor': 'rgba(139, 139, 139, 0.1)'},
     }
 }
-
 
 colors = {
     'age': ['#C700E5','#9D00DB', '#7300D2','#4900C8','#1F00BF'],
@@ -119,7 +119,6 @@ def resolve_missing_counties(df, df_):
     df_ = cudf.concat([df_, df_not_in_yesterday]).sort_values('COUNTY').reset_index()
     return df, df_
 
-
 def load_covid(BASE_URL):
     print('loading latest covid dataset...')
     df_temp = []
@@ -127,11 +126,16 @@ def load_covid(BASE_URL):
     last_n_days = (datetime.date.today() - datetime.date(2020, 3, 25)).days
     today = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%m-%d-%Y")
 
+    if requests.get(BASE_URL % (datetime.date.today()).strftime("%m-%d-%Y")).status_code == 200:
+        today = (datetime.date.today()).strftime("%m-%d-%Y")
+
     path = '../data/'+today+'.parquet'
     if not os.path.exists(path):
         print('downloading latest covid dataset...')
-        for i in range(last_n_days+1):
-            date_ = str((datetime.date.today() - datetime.timedelta(days=i+1)).strftime("%m-%d-%Y"))
+        for i in range(last_n_days):
+            date_ = str((datetime.date.today() - datetime.timedelta(days=i)).strftime("%m-%d-%Y"))
+            if requests.get(BASE_URL % date_).status_code == 404:
+                continue
             path = '../data/'+date_+'.parquet'
             if not os.path.exists(path):
                 df_temp.append(
@@ -275,12 +279,6 @@ app.layout = html.Div(children=[
                 )
             ], className='seven columns pretty_container', id="indicator-div"),
             html.Div(children=[
-                html.Div(children=[
-                    html.Button(
-                        "Reset GPU", id='reset-gpu', className='reset-button'
-                    ),
-                    html.Div(id='reset-gpu-complete', style={'display': 'hidden'})
-                ]),
                 html.H4([
                     "Display Options",
                 ], className="container_title"),
@@ -386,9 +384,6 @@ app.layout = html.Div(children=[
         html.Div(children=[
             html.Div(
                 children=[
-                    html.Button(
-                        "Clear Selection", id='clear-covid', className='reset-button'
-                    ),
                     html.Div(dcc.Dropdown(
                                 id='scale-covid-dropdown',
                                 options=[
@@ -459,13 +454,6 @@ app.layout = html.Div(children=[
     [Input('reset-map', 'n_clicks'), Input('clear-all', 'n_clicks')]
 )
 def clear_map(*args):
-    return None
-
-@app.callback(
-    Output('covid-histogram', 'selectedData'),
-    [Input('clear-covid', 'n_clicks'), Input('clear-all', 'n_clicks')]
-)
-def clear_covid_hist_selections(*args):
     return None
 
 # Query string helpers
@@ -626,8 +614,7 @@ def build_datashader_plot(
         else:
             # Shade aggregation into an image that we can add to the map as a mapbox
             # image layer
-            max_px = 1
-            img = tf.shade(agg, **datashader_color_scale).to_pil()
+            img = tf.shade(agg, how='log',**datashader_color_scale).to_pil()
 
 
             # Add image as mapbox image layer. Note that as of version 4.4, plotly will
@@ -647,16 +634,11 @@ def build_datashader_plot(
         
         
         if aggregate == 'count_cat':
+            colorscale = (10 ** np.linspace(0, 1, len(colors['age'])) - 1) / 9
             marker = dict(
                     size=0,
                     showscale=True,
-                    colorscale=[
-                        (0.0, 'rgb(198, 0, 229)'),
-                        (0.25, 'rgb(157, 0, 219)'),
-                        (0.50, 'rgb(115, 0, 210)'),
-                        (0.75, 'rgb(73, 0, 200)'),
-                        (1.0, 'rgb(31, 0, 191)'),
-                    ],
+                    colorscale=[(v, clr) for v, clr in zip(colorscale, colors['age'])],
                     name='Age',
                     cmin=0,
                     cmax=65,
@@ -1156,7 +1138,13 @@ def register_update_plots_callback(client):
             hospital_enabled, hospital_colorscale,
             covid_enabled, covid_count_type,
     ):
-        global data_3857, data_center_3857, data_4326, data_center_4326
+        global data_3857, data_center_3857, data_4326, data_center_4326, covid_last_update_time
+
+        if int(time.time() - covid_last_update_time) > 21600:
+            # update covid data every six hours
+            update_covid_data(client)
+            covid_last_update_time = time.time()
+
 
         t0 = time.time()
 
@@ -1220,6 +1208,15 @@ def check_dataset(dataset_url, data_path):
     else:
         print(f"Found dataset at {data_path}")
 
+def update_covid_data(client):
+    global cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4
+    covid_data_path = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/%s.csv'
+    print("Updating Covid data")
+    cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4 = None, None, None, None            
+    pd_covid = delayed(load_covid)(covid_data_path).persist()
+    client.unpublish_dataset('pd_covid')
+    client.publish_dataset(pd_covid=pd_covid)
+
 def publish_dataset_to_cluster():
     census_data_url = 'https://s3.us-east-2.amazonaws.com/rapidsai-data/viz-data/census_data_minimized.parquet.tar.gz'
     census_data_path = "../data/census_data_minimized.parquet"
@@ -1260,26 +1257,6 @@ def publish_dataset_to_cluster():
 
     # Precompute field bounds
     c_df_d = client.get_dataset('c_df_d')
-
-    # Define callback to restart cluster and reload datasets
-    @app.callback(
-        Output('reset-gpu-complete', 'children'),
-        [Input('reset-gpu', 'n_clicks')]
-    )
-    def restart_cluster(n_clicks):
-        global cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4
-        
-
-        if n_clicks:
-            print("Restarting LocalCUDACluster")
-            cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4 = None, None, None, None
-            # client.unpublish_dataset('pd_df_d')
-            client.unpublish_dataset('c_df_d')
-            client.unpublish_dataset('pd_covid')
-            client.unpublish_dataset('pd_hospitals')
-            client.unpublish_dataset('c_acs_2018')
-            client.restart()
-            load_and_publish_dataset()
 
     # Register top-level callback that updates plots
     register_update_plots_callback(client)
