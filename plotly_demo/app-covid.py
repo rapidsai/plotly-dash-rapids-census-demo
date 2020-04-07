@@ -17,7 +17,7 @@ from dash.dependencies import Input, Output
 import dash_daq as daq
 from plotly.colors import sequential
 from pyproj import Transformer
-import dask_cudf
+
 from dask import delayed
 from distributed import Client
 from dask_cuda import LocalCUDACluster
