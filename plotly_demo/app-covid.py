@@ -37,9 +37,10 @@ bgcolor = "#191a1a"  # mapbox dark map land color
 text_color = "#cfd8dc"  # Material blue-grey 100
 mapbox_land_color = "#343332"
 covid_last_update_time = time.time()
+covid_last_update_date = datetime.datetime.today().strftime("%b-%d-%Y at %H:%M")
 
 # Figure template
-row_heights = [120, 460, 200, 1600, 300, 120]
+row_heights = [200, 460, 200, 1600, 300, 100]
 template = {
     'layout': {
         'paper_bgcolor': bgcolor,
@@ -110,11 +111,12 @@ def resolve_missing_counties(df, df_):
             df_not_in_today[i] = df_not_in_today[str(i)+'_']
     df_not_in_today = df_not_in_today[df.columns]
     df = cudf.concat([df, df_not_in_today]).sort_values('COUNTY').reset_index()
+    
     df_not_in_yesterday = test_df[test_df.Deaths_.isna()]
     for i in df_.columns:
         if i == 'Confirmed' or i == 'Deaths':
             df_not_in_yesterday[str(i)] = 0
-
+    df_not_in_yesterday['Last_Update'] = df_not_in_yesterday['Last_Update_']
     df_not_in_yesterday = df_not_in_yesterday[df_.columns]
     df_ = cudf.concat([df_, df_not_in_yesterday]).sort_values('COUNTY').reset_index()
     return df, df_
@@ -256,11 +258,6 @@ app.layout = html.Div(children=[
     html.Div(children=[
         html.Div(children=[
             html.Div(children=[
-                html.Div(children=[
-                    html.Button(
-                        "Clear All Selections", id='clear-all', className='reset-button'
-                    ),
-                ]),
                 html.Div([
                     dash_dangerously_set_inner_html.DangerouslySetInnerHTML(
                         """
@@ -277,7 +274,7 @@ app.layout = html.Div(children=[
                     ),
                     style={'height': row_heights[5]},
                 )
-            ], className='seven columns pretty_container', id="indicator-div"),
+            ],  style={'height': row_heights[0]}, className='seven columns pretty_container', id="indicator-div"),
             html.Div(children=[
                 html.H4([
                     "Display Options",
@@ -349,7 +346,7 @@ app.layout = html.Div(children=[
                                 id='covid_count_type',
                                 options=[
                                     {'label': 'Total Cases', 'value': 0},
-                                    {'label': '% change since last 2 days', 'value': 1},
+                                    {'label': '% increase since last 2 days', 'value': 1},
                                     {'label': 'Case / County Population (2018 ACS)', 'value': 2},
                                 ],
                                 value=0,
@@ -357,11 +354,11 @@ app.layout = html.Div(children=[
                                 clearable=False,
                             ), style={'width': '50%', 'height':'15px'}),
                         ])
-                ], style={'width': '100%', 'height': row_heights[0]}),
-            ], className='five columns pretty_container', id="config-div"),
+                ], style={'width': '100%'}),
+            ],   style={'height': row_heights[0]}, className='five columns pretty_container', id="config-div"),
         ]),
         html.Div(children=[
-            html.Button("Clear Selection", id='reset-map', className='reset-button'),
+            html.Button("Reset View", id='reset-map', className='reset-button'),
             html.Div([
                 dash_dangerously_set_inner_html.DangerouslySetInnerHTML(
                         """
@@ -427,10 +424,10 @@ app.layout = html.Div(children=[
     html.Div(
         [
             html.H4('Acknowledgments and Data Sources', style={"margin-top": "0"}),
-            dcc.Markdown('''
+            dcc.Markdown(f'''
 - [1] 2010 Population Census and [4] 2018 ACS data used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](www.nhgis.org) ( not for redistribution )
 - [2] Hospital data is from [HIFLD](https://hifld-geoplatform.opendata.arcgis.com/datasets/hospitals) (10/7/2019) and does not contain emergency field hospitals
-- [3] COVID-19 data is from the [Johns Hopkins University](https://coronavirus.jhu.edu/) data on [GitHub](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) (updated daily)
+- [3] COVID-19 data is from the [Johns Hopkins University](https://coronavirus.jhu.edu/) data on [GitHub](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) (last updated {covid_last_update_date})
 - Base map layer provided by [mapbox](https://www.mapbox.com/)
 - Dashboard developed with Plot.ly [Dash](https://dash.plotly.com/)
 - Geospatial point rendering developed with [Datashader](https://datashader.org/)
@@ -447,14 +444,6 @@ app.layout = html.Div(children=[
         className='twelve columns pretty_container',
     ),
 ])
-
-# Clear/reset button callbacks
-@app.callback(
-    Output('map-graph', 'relayoutData'),
-    [Input('reset-map', 'n_clicks'), Input('clear-all', 'n_clicks')]
-)
-def clear_map(*args):
-    return None
 
 # Query string helpers
 def bar_selection_to_query(selection, column):
@@ -550,7 +539,7 @@ def build_datashader_plot(
                     'style': "dark",
                     'accesstoken': token,
                 },
-                'margin': {"r": 0, "t": 0, "l": 0, "b": 0},
+                'margin': {"r": 140, "t": 0, "l": 0, "b": 0},
                 'height': 500,
                 'shapes': [{
                     'type': 'rect',
@@ -631,15 +620,17 @@ def build_datashader_plot(
             lat = [None]
             lon = [None]
             customdata = [None]
-        
-        
+
         if aggregate == 'count_cat':
+            # for `Age By PurBlue` category
             colorscale = (10 ** np.linspace(0, 1, len(colors['age'])) - 1) / 9
             marker = dict(
                     size=0,
                     showscale=True,
+                    colorbar= {"title": {
+                        "text": 'Age', "side": "right", "font": {"size": 14}
+                    }},
                     colorscale=[(v, clr) for v, clr in zip(colorscale, colors['age'])],
-                    name='Age',
                     cmin=0,
                     cmax=65,
                 )
@@ -650,13 +641,17 @@ def build_datashader_plot(
                     'lat': lat, 'lon': lon,
                     'customdata': customdata,
                     'marker': marker,
-                    'hoverinfo': 'none'
+                    'hoverinfo': 'none',
                 }
             )
+            map_graph['layout']['annotations'] = []
         else:
             marker = dict(
                     size=0,
                     showscale=True,
+                    colorbar= {"title": {
+                        "text": 'Population', "side": "right", "font": {"size": 14}
+                    }},
                     colorscale=build_colorscale(
                         population_colorscale, colorscale_transform,
                         aggregate, aggregate_column
@@ -723,7 +718,9 @@ def build_datashader_plot(
         today = df_covid.Last_Update.to_pandas().max().strftime("%B, %d")
         size_markers = np.copy(df_covid.Confirmed.to_array())
         size_markers_labels = np.copy(size_markers)
-
+        annotations = {
+                'text': size_markers_labels
+        }
         if covid_count_type == 0:
             size_markers[size_markers <= 2] = 2
             factor = 'Confirmed Cases as of '+today+' = %{text}'
@@ -732,20 +729,27 @@ def build_datashader_plot(
         if covid_count_type == 1:
             size_markers_yesterday = np.copy(df_covid_yesterday.Confirmed.to_array())
             size_markers_yesterday[size_markers_yesterday == 0] = 1
-            size_markers = (np.nan_to_num((size_markers - df_covid_yesterday.Confirmed.to_array())/size_markers_yesterday)).astype('int64')*100
+            size_markers = (np.nan_to_num((size_markers - df_covid_yesterday.Confirmed.to_array())*100/size_markers_yesterday)).astype('int64')
             size_markers_labels = np.copy(size_markers)
-            factor = 'Percentage change since '+yesterday+' = %{text}%'
+            size_markers = np.absolute(size_markers)
+            annotations = {
+                'text': size_markers_labels,
+                'customdata': np.vstack([df_covid_yesterday.Confirmed.to_array(), df_covid.Confirmed.to_array()]).T
+            }
+            factor = 'Confirmed cases:<br> '+yesterday+': %{customdata[0]}<br> '+today+': %{customdata[1]}<br> % increase = %{text}'
             sizeref = 15
             marker_border = 32
         elif covid_count_type == 2:
             df_covid = df_covid.merge(df_acs2018, on='COUNTY')
             size_markers = df_covid.Confirmed.to_array()
-            size_markers = np.around(np.nan_to_num(size_markers/df_covid.acs2018_population.to_array()).astype('float'), 5)
-            size_markers_labels = [np.format_float_scientific(x) for x in list(size_markers)]
-            size_markers[size_markers <= 0.0003] = 0.0003
-            factor = '<i>sourced from LATEST 2018 census projection </i> <br> No. of cases / county population = %{text}'
-            sizeref = 0.0001
-            marker_border = 0.0002
+            size_markers = np.nan_to_num(size_markers/(df_covid.acs2018_population.to_array()/1000)).astype('float')
+            size_markers_labels = np.around(size_markers, 2)
+            annotations = {
+                'text': size_markers_labels
+            }
+            factor = '<i>sourced from LATEST 2018 census projection </i> <br>No. of cases / 1000 people = %{text}'
+            sizeref = 5/(size_markers.max())
+            marker_border = 2*sizeref
 
         size_markers[size_markers >= np.percentile(size_markers, 99.9)] = np.percentile(size_markers, 99.9)
 
@@ -778,13 +782,14 @@ def build_datashader_plot(
                 'hovertemplate': (
                     '<b>%{hovertext}</b><br><br>'+factor+'<extra></extra>'
                 ),
-                'text': size_markers_labels,
+                **annotations,
                 'hovertext': df_covid.COUNTY,
                 'mode': 'markers',
                 'showlegend': False,
                 'subplot': 'mapbox'
             }
         )
+
 
     return map_graph
 
@@ -1026,7 +1031,7 @@ def build_updated_figures(
         query_expr_xy_hosp = f"(X >= {x0}) & (X <= {x1}) & (Y >= {y0}) & (Y <= {y1})"
         df_hospitals = df_hospitals.query(query_expr_xy_hosp).reset_index(drop=True)
         n_selected_indicator['data'].append({
-            'title': {"text": "Known Hopital Beds"},
+            'title': {"text": "Known Hospital Beds"},
             'type': 'indicator',
             'value': df_hospitals.BEDS.sum(),
             'domain': domain_1,
@@ -1144,6 +1149,7 @@ def register_update_plots_callback(client):
             # update covid data every six hours
             update_covid_data(client)
             covid_last_update_time = time.time()
+            covid_last_update_date = datetime.datetime.today().strftime("%b-%d-%Y at %H:%M")
 
 
         t0 = time.time()
