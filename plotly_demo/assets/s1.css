@@ -441,7 +441,7 @@
   –––––––––––––––––––––––––––––––––––––––––––––––––– */
   .reset-button {
     /* width: 100%; */
-    margin-bottom: 5px;
+    margin-top: -5px;
     height: 36px;
     line-height: 36px;
     float: right;
