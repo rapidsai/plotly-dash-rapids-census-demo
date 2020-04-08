@@ -2,3 +2,6 @@
 *csv
 *-checkpoint.ipynb
 *.arrow
+*.vscode
+*.mapbox_token
+dask-worker-space

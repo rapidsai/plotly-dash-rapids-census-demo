@@ -241,16 +241,16 @@ app = dash.Dash(__name__)
 app.layout = html.Div(children=[
     html.Div([
         html.H1(children=[
-            'US Population 2010 | COVID-19',
+            'COVID-19 Cases Overlaid on US Census Data',
             html.A(
                 html.Img(
-                    src="https://camo.githubusercontent.com/38ca5c5f7d6afc09f8d50fd88abd4b212f0a6375/68747470733a2f2f7261706964732e61692f6173736574732f696d616765732f7261706964735f6c6f676f2e706e67",
-                    style={'float': 'right', 'height': '50px', 'margin-right': '2%'}
+                    src="assets/rapids-logo.png",
+                    style={'float': 'right', 'height': '55px', 'margin-top': '-10px', 'margin-right': '20px'}
                 ), href="https://rapids.ai/"),
             html.A(
                 html.Img(
                     src="assets/dash-logo.png",
-                    style={'float': 'right', 'height': '50px', 'margin-right': '2%'}
+                    style={'float': 'right', 'height': '35px'}
                 ), href="https://dash.plot.ly/"),
 
         ], style={'text-align': 'left'}),
@@ -261,7 +261,7 @@ app.layout = html.Div(children=[
                 html.Div([
                     dash_dangerously_set_inner_html.DangerouslySetInnerHTML(
                         """
-                        <h4 class='container_title'> Population (2010)<sup>1</sup> | Known Hospital Beds (2019)<sup>2</sup> | Covid Cases (Daily)<sup>3</sup></h4>
+                        <h4 class='container_title'>US Population (2010)<sup>1</sup> Hospital Beds (2019)<sup>2</sup> and Total COVID-19 Cases by County (Daily)<sup>3</sup> on Map</h4>
                         """
                     ),
                 ], className="container_title"),
@@ -280,12 +280,12 @@ app.layout = html.Div(children=[
                     "Display Options",
                 ], className="container_title"),
                 html.Table([
-                    html.Col(style={'width': '100px'}),
+                    html.Col(style={'width': '180'}),
                     html.Col(),
                     html.Col(),
                     html.Tr([
                             html.Td(
-                                html.Div("Population"), className="config-label"
+                                html.Div("US Population"), className="config-label"
                             ),
                             html.Td(daq.DarkThemeProvider(daq.BooleanSwitch(
                                 on=True,
@@ -293,13 +293,13 @@ app.layout = html.Div(children=[
                                 id='population-toggle',
                             ))),
                             html.Td(
-                                html.Div("Total by"), className="config-label"
+                                html.Div("Color Type"), className="config-label"
                             ),
                             html.Td(dcc.Dropdown(
                                 id='colorscale-dropdown-population',
                                 options=[
-                                    {'label': 'Age by '+cs if cs == 'Purblue' else 'Total by '+cs, 'value': cs}
-                                    for cs in ['Purblue', 'Viridis', 'Cividis', 'Inferno', 'Magma', 'Plasma']
+                                    {'label': 'Age by '+cs+' Color Scale' if cs == 'Purblue' else 'Total by '+cs+' Color Scale', 'value': cs}
+                                    for cs in ['Purblue', 'Viridis', 'Cividis', 'Plasma']
                                 ],
                                 value='Purblue',
                                 searchable=False,
@@ -308,7 +308,7 @@ app.layout = html.Div(children=[
                         ]),
                     html.Tr([
                             html.Td(
-                                html.Div("Hospitals"), className="config-label"
+                                html.Div("Hospital Beds"), className="config-label"
                             ),
                             html.Td(daq.DarkThemeProvider(daq.BooleanSwitch(
                                 on=False,
@@ -316,14 +316,14 @@ app.layout = html.Div(children=[
                                 id='hospital-toggle',
                             ))),
                             html.Td(
-                                html.Div("Color Setting"), className="config-label"
+                                html.Div("Color"), className="config-label"
                             ),
                             html.Td(dcc.Dropdown(
                                 id='colorscale-dropdown-hospital',
                                 options=[
-                                    {'label': 'white', 'value': 'white'},
-                                    {'label': 'blue', 'value': '#00d0ff'},
-                                    {'label': 'orange', 'value': '#ffa41c'}
+                                    {'label': 'White', 'value': 'white'},
+                                    {'label': 'Blue', 'value': '#00d0ff'},
+                                    {'label': 'Orange', 'value': '#ffa41c'}
                                 ],
                                 value='white',
                                 searchable=False,
@@ -332,7 +332,7 @@ app.layout = html.Div(children=[
                         ]),
                     html.Tr([
                             html.Td(
-                                html.Div("COVID-19"), className="config-label"
+                                html.Div("COVID-19 Cases"), className="config-label"
                             ),
                             html.Td(daq.DarkThemeProvider(daq.BooleanSwitch(
                                 on=True,
@@ -346,8 +346,8 @@ app.layout = html.Div(children=[
                                 id='covid_count_type',
                                 options=[
                                     {'label': 'Total Cases', 'value': 0},
-                                    {'label': '% increase since last 2 days', 'value': 1},
-                                    {'label': 'Case / County Population (2018 ACS)', 'value': 2},
+                                    {'label': 'Percentage Increase of Last 2 Days', 'value': 1},
+                                    {'label': 'Case Per Capita by County', 'value': 2},
                                 ],
                                 value=0,
                                 searchable=False,
@@ -362,7 +362,7 @@ app.layout = html.Div(children=[
             html.Div([
                 dash_dangerously_set_inner_html.DangerouslySetInnerHTML(
                         """
-                        <h4 class='container_title'> Population Density (2010)<sup>1</sup> | Known Hospital and Beds (2019)<sup>2</sup> | Reported COVID Cases by County (Daily)<sup>3</sup> | Zoom to filter</h4>
+                        <h4 class='container_title'>Pan and Zoom Map with Mouse | Filter Data with Box Select Tool</h4>
                         """
                     )
             ], className="container_title"),
@@ -404,7 +404,7 @@ app.layout = html.Div(children=[
                     html.Div([
                         dash_dangerously_set_inner_html.DangerouslySetInnerHTML(
                             """
-                                <h4 class='container_title'> Reported COVID Cases (total) and Deaths (total) by State <sup>3</sup> </h4>
+                                <h4 class='container_title'>Total COVID-19 Cases and Deaths by US States and Territories (Daily)<sup>3</sup></h4>
                             """
                         )
                     ], className="container_title"),
@@ -425,15 +425,16 @@ app.layout = html.Div(children=[
         [
             html.H4('Acknowledgments and Data Sources', style={"margin-top": "0"}),
             dcc.Markdown(f'''
-- [1] 2010 Population Census and [4] 2018 ACS data used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](www.nhgis.org) ( not for redistribution )
-- [2] Hospital data is from [HIFLD](https://hifld-geoplatform.opendata.arcgis.com/datasets/hospitals) (10/7/2019) and does not contain emergency field hospitals
-- [3] COVID-19 data is from the [Johns Hopkins University](https://coronavirus.jhu.edu/) data on [GitHub](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) (last updated {covid_last_update_date})
+- 1: US Population data is from 2010 Census and 2018 ACS, sourced with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](www.nhgis.org) ( not for redistribution )
+- 2: Hospital data is from [HIFLD](https://hifld-geoplatform.opendata.arcgis.com/datasets/hospitals) ( Updated Oct-07-2019 ) and does not contain emergency field hospitals
+- 3: COVID-19 data is from the [Johns Hopkins University](https://coronavirus.jhu.edu/) data on [GitHub](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) ( Updated {covid_last_update_date} )
 - Base map layer provided by [mapbox](https://www.mapbox.com/)
 - Dashboard developed with Plot.ly [Dash](https://dash.plotly.com/)
 - Geospatial point rendering developed with [Datashader](https://datashader.org/)
 - GPU accelerated with [RAPIDS](https://rapids.ai/) [cudf](https://github.com/rapidsai/cudf) and [cupy](https://cupy.chainer.org/) libraries
-- For more information reach out with this [Covid-19 Slack Channel](https://join.slack.com/t/rapids-goai/shared_invite/zt-2qmkjvzl-K3rVHb1rZYuFeczoR9e4EA)
-- For source code visit our [GitHub](https://github.com/rapidsai/plotly-dash-rapids-census-demo)
+- Cloud hosting provided by [Google](https://cloud.google.com/)
+- For more information, reach out on this [Covid-19 Slack Channel](https://join.slack.com/t/rapids-goai/shared_invite/zt-2qmkjvzl-K3rVHb1rZYuFeczoR9e4EA)
+- For source code, bug notes, or feature requests, visit our [GitHub](https://github.com/rapidsai/plotly-dash-rapids-census-demo)
 '''),
         ],
         style={
@@ -702,7 +703,7 @@ def build_datashader_plot(
                     sizeref=120,
                 ),
                 'hovertemplate': (
-                    '<b>%{hovertext}</b><br><br>BEDS = %{text}<extra></extra>'
+                    '<b>%{hovertext}</b> <br><br>Known Beds: <b>%{text} </b> <extra></extra>'
                 ),
                 'text': df_hospitals.BEDS,
                 'hovertext': df_hospitals.NAME,
@@ -723,7 +724,7 @@ def build_datashader_plot(
         }
         if covid_count_type == 0:
             size_markers[size_markers <= 2] = 2
-            factor = 'Confirmed Cases as of '+today+' = %{text}'
+            factor = 'As of '+today+' <br>Cases: <b>%{text}</b> <br>'
             sizeref = 120
             marker_border = 250
         if covid_count_type == 1:
@@ -736,7 +737,7 @@ def build_datashader_plot(
                 'text': size_markers_labels,
                 'customdata': np.vstack([df_covid_yesterday.Confirmed.to_array(), df_covid.Confirmed.to_array()]).T
             }
-            factor = 'Confirmed cases:<br> '+yesterday+': %{customdata[0]}<br> '+today+': %{customdata[1]}<br> % increase = %{text}'
+            factor = 'Cases as of: <br>'+yesterday+': <b>%{customdata[0]}</b> <br>'+today+': %{customdata[1]} <br>Increase: <b> %{text} %</b> <br>'
             sizeref = 15
             marker_border = 32
         elif covid_count_type == 2:
@@ -747,7 +748,7 @@ def build_datashader_plot(
             annotations = {
                 'text': size_markers_labels
             }
-            factor = '<i>sourced from LATEST 2018 census projection </i> <br>No. of cases / 1000 people = %{text}'
+            factor = 'Population Data from 2018 ACS <br>Cases Per 1000 People: <b> %{text} </b> <br>'
             sizeref = 5/(size_markers.max())
             marker_border = 2*sizeref
 
@@ -972,7 +973,7 @@ def build_updated_figures(
     # Build indicator figure
     n_selected_indicator = {
         'data': [{
-            'title': {"text": "Visible Population"},
+            'title': {"text": "Population"},
             'type': 'indicator',
             'value': len(
                 df_map
@@ -1002,7 +1003,7 @@ def build_updated_figures(
         query_expr_xy_hosp = f"(Long_ >= {x0}) & (Long_ <= {x1}) & (Lat >= {y0}) & (Lat <= {y1})"
         df_covid = df_covid[1].query(query_expr_xy_hosp).reset_index(drop=True)
         n_selected_indicator['data'].append({
-            'title': {"text": "Visible Total Cases"},
+            'title': {"text": "Total Cases"},
             'type': 'indicator',
             'value': df_covid.Confirmed.sum(),
             'domain': {'x': [0.51, 1], 'y': [0, 0.5]},
@@ -1031,7 +1032,7 @@ def build_updated_figures(
         query_expr_xy_hosp = f"(X >= {x0}) & (X <= {x1}) & (Y >= {y0}) & (Y <= {y1})"
         df_hospitals = df_hospitals.query(query_expr_xy_hosp).reset_index(drop=True)
         n_selected_indicator['data'].append({
-            'title': {"text": "Known Hospital Beds"},
+            'title': {"text": "Hospital Beds"},
             'type': 'indicator',
             'value': df_hospitals.BEDS.sum(),
             'domain': domain_1,
@@ -1073,9 +1074,9 @@ def generate_covid_bar_plots(df, scale_covid, category_covid):
     for state in states:
         df_temp = df.query('Province_State == @state').reset_index(drop=True)
         if(category_covid == 'Total cases'):
-            fig.add_trace(go.Scatter(x=df_temp.Last_Update, y=df_temp.Confirmed, name='Confirmed', marker=dict(color='#c724e5'), hoverinfo='text', hovertemplate='Confirmed=%{text}<extra></extra>', text=df_temp.Confirmed), row=int(index/5) + 1, col=int(index%5)+1)
+            fig.add_trace(go.Scatter(x=df_temp.Last_Update, y=df_temp.Confirmed, name='Confirmed', marker=dict(color='#c724e5'), hoverinfo='text', hovertemplate='Confirmed: <b>%{text}</b><extra></extra>', text=df_temp.Confirmed), row=int(index/5) + 1, col=int(index%5)+1)
         else:
-            fig.add_trace(go.Scatter(x=df_temp.Last_Update, y=df_temp.Deaths, name='Deaths', marker=dict(color='#b7b7b7'), hoverinfo='text', hovertemplate='Deaths=%{text}<extra></extra>', text=df_temp.Deaths), row=int(index/5) + 1, col=int(index%5)+1)
+            fig.add_trace(go.Scatter(x=df_temp.Last_Update, y=df_temp.Deaths, name='Deaths', marker=dict(color='#b7b7b7'), hoverinfo='text', hovertemplate='Deaths: <b>%{text}</b><extra></extra>', text=df_temp.Deaths), row=int(index/5) + 1, col=int(index%5)+1)
         
         fig.update_yaxes(rangemode='tozero',autorange=True, type=scale_covid, row=int(index/5) + 1, col=int(index%5)+1)
         index += 1
