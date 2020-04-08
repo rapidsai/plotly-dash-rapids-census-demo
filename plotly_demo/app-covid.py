@@ -55,28 +55,24 @@ template = {
 
 colors = {
     'age': ['#C700E5','#9D00DB', '#7300D2','#4900C8','#1F00BF'],
-    # 'age': ['red','green', 'blue','orange']
 }
-mappings = {}
 
 # Load mapbox token from environment variable or file
 token = os.getenv('MAPBOX_TOKEN')
 if not token:
     token = open(".mapbox_token").read()
 
-
-# Names of float columns
-float_columns = [
-    'x', 'y'
-]
+# global variables to save state
 cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4 = None, None, None, None
 data_center_3857, data_3857, data_4326, data_center_4326 = [], [], [], []
 coordinates_4326_backup, position_backup = None, None
 reset_map_g = 0
+
+
 def load_dataset(path):
     """
     Args:
-        path: Path to arrow file containing census2010 dataset
+        path: Path to arrow file containing census2010/acs2018 dataset
 
     Returns:
         cudf DataFrame
@@ -85,9 +81,8 @@ def load_dataset(path):
         path = path + '/*'
     df_d = cudf.read_parquet(path)
     if 'age' in df_d.columns:
+        # convert age column to category dtype in census 2010 dataset
         df_d.drop_column('sex')
-        # df_d.drop_column('age')
-    # df_d = df_d.head(220_000_000)
         df_d['age'][df_d['age']<=20] = 1
         mask_ = (df_d['age']>20) & (df_d['age']<=40)
         df_d['age'][mask_] = 2
@@ -112,7 +107,6 @@ def resolve_missing_counties(df, df_):
             df_not_in_today[i] = df_not_in_today[str(i)+'_']
     df_not_in_today = df_not_in_today[df.columns]
     df = cudf.concat([df, df_not_in_today]).sort_values('COUNTY').reset_index()
-    
     df_not_in_yesterday = test_df[test_df.Deaths_.isna()]
     for i in df_.columns:
         if i == 'Confirmed' or i == 'Deaths':
@@ -122,10 +116,15 @@ def resolve_missing_counties(df, df_):
     df_ = cudf.concat([df_, df_not_in_yesterday]).sort_values('COUNTY').reset_index()
     return df, df_
 
-def load_covid(BASE_URL):
+
+def load_covid(BASE_URL, acs_path):
+    '''
+        load latest covid dataset from BASE_URL, 
+        merge all csv files from previous dates and save a cached version
+    '''
     print('loading latest covid dataset...')
     df_temp = []
-
+    df_acs2018 = load_dataset(acs_path)
     last_n_days = (datetime.date.today() - datetime.date(2020, 3, 25)).days
     today = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%m-%d-%Y")
 
@@ -182,13 +181,21 @@ def load_covid(BASE_URL):
     ).reset_index()
     df_county = df_county.merge(df_combined_key, on='COUNTY')
     df_county.Last_Update = pd.to_datetime(df_county.Last_Update.str.split(' ')[0].to_pandas().astype('str'))
+
+    # keep separate dataframes for last 2 days
     last_2_days = np.sort(df_county.Last_Update.unique().to_array())[-2:]
     df_count_latest = df_county.query('Last_Update == @last_2_days[-1]').drop_duplicates('COUNTY').reset_index(drop=True)
+
     df_count_latest_minus_1 = df_county.query('Last_Update == @last_2_days[0]').drop_duplicates('COUNTY').reset_index(drop=True)
     df_count_latest, df_count_latest_minus_1 = resolve_missing_counties(df_count_latest, df_count_latest_minus_1)
-    return (df_states_last_n_days, df_count_latest, df_count_latest_minus_1)
+
+    df_county_ratio = df_count_latest.merge(df_acs2018, on='COUNTY')
+    return (df_states_last_n_days, df_count_latest, df_count_latest_minus_1, df_county_ratio)
 
 def load_hospitals(path):
+    '''
+        load hospitals dataset
+    '''
     df_hospitals = pd.read_csv(path, usecols=['X', 'Y', 'BEDS', 'NAME'])
     df_hospitals['BEDS_label'] = df_hospitals.BEDS.replace(-999, 'unknown')
     df_hospitals.BEDS = df_hospitals.BEDS.replace(-999, 0)
@@ -395,10 +402,10 @@ app.layout = html.Div(children=[
                     html.Div(dcc.Dropdown(
                                 id='category-covid-dropdown',
                                 options=[
-                                    {'label': cs, 'value': cs}
-                                    for cs in ['Total cases', 'Total deaths']
+                                    {'label': 'Total cases', 'value': 0},
+                                    {'label': 'Total deaths', 'value': 1}
                                 ],
-                                value='Total cases',
+                                value=0,
                                 searchable=False,
                                 clearable=False,
                             ), style={'width': '10%', 'height':'30px', 'float': 'right'}),
@@ -447,47 +454,6 @@ app.layout = html.Div(children=[
     ),
 ])
 
-
-# Query string helpers
-def bar_selection_to_query(selection, column):
-    """
-    Compute pandas query expression string for selection callback data
-
-    Args:
-        selection: selectedData dictionary from Dash callback on a bar trace
-        column: Name of the column that the selected bar chart is based on
-
-    Returns:
-        String containing a query expression compatible with DataFrame.query. This
-        expression will filter the input DataFrame to contain only those rows that
-        are contained in the selection.
-    """
-    point_inds = [p['label'] for p in selection['points']]
-    xmin = min(point_inds) #bin_edges[min(point_inds)]
-    xmax = max(point_inds) + 1 #bin_edges[max(point_inds) + 1]
-    xmin_op = "<="
-    xmax_op = "<="
-    return f"{xmin} {xmin_op} {column} and {column} {xmax_op} {xmax}"
-
-
-def build_query(selections, exclude=None):
-    """
-    Build pandas query expression string for cross-filtered plot
-
-    Args:
-        selections: Dictionary from column name to query expression
-        exclude: If specified, column to exclude from combined expression
-
-    Returns:
-        String containing a query expression compatible with DataFrame.query.
-    """
-    other_selected = {sel for c, sel in selections.items() if (c != exclude and sel != -1)}
-    if other_selected:
-        return ' and '.join(other_selected)
-    else:
-        return None
-
-
 # Plot functions
 def build_colorscale(colorscale_name, transform, agg, agg_col):
     """
@@ -520,18 +486,34 @@ def build_colorscale(colorscale_name, transform, agg, agg_col):
 
 def build_datashader_plot(
         df, aggregate, aggregate_column, new_coordinates, position,
-        x_range, y_range, df_hospitals, df_covid, df_acs2018, population_enabled,
+        x_range, y_range, df_hospitals, df_covid, population_enabled,
         population_colorscale, hospital_enabled, hospital_colorscale,
         covid_enabled, covid_count_type, colorscale_transform, selected_map
 ):
     """
-    Build choropleth figure
-
+    Description
+        Build datashader figure - with census, covid and hospital layers
     Args:
-
+        - df: census 2010 dataset (cudf.DataFrame)
+        - aggregate: aggregate function (str)
+        - aggregate_column: aggregate column (census column name)
+        - new_coordinates: updated coordinates for mapbox layer with datashader
+        - position: updated position for mapbox layer with datashader
+        - x_range: longitude (min, max) for datashader
+        - y_range: latitude (min, max) for datashader
+        - df_hospitals: hospitals dataset (cudf.DataFrame)
+        - df_covid: covid dataset (cudf.DataFrame)
+        - population_enabled: Bool
+        - population_colorscale: colorscale name (str)
+        - hospital_enabled: Bool
+        - hospital_colorscale: colorscale name (str)
+        - covid_enabled: Bool
+        - covid_count_type: count/count_cat
+        - colorscale_transform: linear/log/sqrt/cbrt
+        - selected_map: selected_map dictionary object from plotly box-select
 
     Returns:
-        Choropleth figure dictionary
+        Datashader figure dictionary
     """
     map_graph = {
         'data': [],
@@ -673,12 +655,14 @@ def build_datashader_plot(
 
         map_graph['layout']['mapbox'].update({'layers': layers})
     map_graph['layout']['mapbox'].update(position)
-
-    selected_points = {
-            'selectedpoints': False
-    }
-    if selected_map is not None:
-        selected_points = {}    
+    selected_points = {}
+    # selected_points = {
+    #         'selectedpoints': False
+    # }
+    # if selected_map is not None:
+    #     selected_points = {
+    #         'selectedpoints': selected_map['points']
+    #     }    
     
     if df_hospitals is not None and isinstance(df_hospitals, pd.DataFrame):
         map_graph['data'].append(
@@ -721,6 +705,7 @@ def build_datashader_plot(
         )
     if df_covid is not None:
         df_covid_yesterday = df_covid[2]
+        df_covid_county_ratio = df_covid[3]
         yesterday = df_covid_yesterday.Last_Update.to_pandas().max().strftime("%B, %d")
         df_covid = df_covid[1]
         today = df_covid.Last_Update.to_pandas().max().strftime("%B, %d")
@@ -732,7 +717,7 @@ def build_datashader_plot(
         if covid_count_type == 0:
             size_markers[size_markers <= 2] = 2
             factor = 'As of '+today+' <br>Cases: <b>%{text}</b> <br>'
-            sizeref = 120
+            sizeref = size_markers.max()/500
             
         if covid_count_type == 1:
             size_markers_yesterday = np.copy(df_covid_yesterday.Confirmed.to_array())
@@ -745,12 +730,10 @@ def build_datashader_plot(
                 'customdata': np.vstack([df_covid_yesterday.Confirmed.to_array(), df_covid.Confirmed.to_array()]).T
             }
             factor = 'Cases as of: <br>'+yesterday+': <b>%{customdata[0]}</b> <br>'+today+': %{customdata[1]} <br>Increase: <b> %{text} %</b> <br>'
-            sizeref = 15
+            sizeref = size_markers.max()/200
 
         elif covid_count_type == 2:
-            df_covid = df_covid.merge(df_acs2018, on='COUNTY')
-            size_markers = df_covid.Confirmed.to_array()
-            size_markers = np.nan_to_num(size_markers/(df_covid.acs2018_population.to_array()/1000)).astype('float')
+            size_markers = np.nan_to_num(df_covid_county_ratio.Confirmed.to_array()/(df_covid_county_ratio.acs2018_population.to_array()/1000)).astype('float')
             size_markers_labels = np.around(size_markers, 2)
             annotations = {
                 'text': size_markers_labels
@@ -768,7 +751,6 @@ def build_datashader_plot(
                 'lon': df_covid.Long_.to_array(),
                 'marker': go.scattermapbox.Marker(
                     size=size_markers + marker_border,
-                    # sizemin=2,
                     color='black',
                     opacity=0.6,
                     sizeref=sizeref,
@@ -803,98 +785,8 @@ def build_datashader_plot(
 
     return map_graph
 
-
-def build_histogram_default_bins(
-        df, column, selections, query_cache, orientation
-):
-    """
-    Build histogram figure
-
-    Args:
-        df: pandas or cudf DataFrame
-        column: Column name to build histogram from
-        selections: Dictionary from column names to query expressions
-        query_cache: Dict from query expression to filtered DataFrames
-
-    Returns:
-        Histogram figure dictionary
-    """
-    bin_edges = df.index.values
-    counts = df.values
-
-    range_ages = [20, 40, 60, 84, 85]
-    colors_ages = ['#C700E5','#9D00DB', '#7300D2','#4900C8','#1F00BF']
-    labels = ['0-20', '21-40', '41-60', '60-84', '85+']
-    # centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
-    if orientation == 'h':
-        fig = {
-            'data':[],
-            'layout': {
-                'xaxis': {
-                    'title': {
-                        'text': "Count"
-                    }
-                },
-                'selectdirection': 'v',
-                'dragmode': 'select',
-                'template': template,
-                'uirevision': True,
-            }
-        }
-    else:
-        fig = {
-            'data':[],
-            'layout': {
-                'yaxis': {
-                    'title': {
-                        'text': "Count"
-                    }
-                },
-                'selectdirection': 'h',
-                'dragmode': 'select',
-                'template': template,
-                'uirevision': True,
-            }
-        }
-
-    for index, ages in enumerate(range_ages):
-        if index == 0:
-            count_temp = counts[:ages]
-            bin_edges_temp = bin_edges[:ages]
-        else:
-            count_temp = counts[range_ages[index-1]:ages]
-            bin_edges_temp = bin_edges[range_ages[index-1]:ages]
-
-        if orientation == 'h':
-            fig['data'].append(
-                {
-                    'type': 'bar', 'x': count_temp, 'y': bin_edges_temp,
-                    'marker': {'color': colors_ages[index]},
-                    'name': labels[index]
-                }
-            )
-        else:
-            fig['data'].append(
-                {
-                    'type': 'bar', 'x': bin_edges_temp, 'y': count_temp,
-                    'marker': {'color': colors_ages[index]},
-                    'name': labels[index]
-                }
-            )
-
-    if column not in selections:
-        for i in range(len(fig['data'])):
-            fig['data'][i]['selectedpoints'] = False
-
-    return fig
-
-def _custom_reset_index(df):
-    #reduces gpu usage by around 2GB
-    df.index = cudf.core.RangeIndex(0, len(df), name=df.index)
-    return df
-
 def build_updated_figures(
-        df, df_hospitals, df_covid, df_acs2018, relayout_data, selected_map,
+        df, df_hospitals, df_covid, relayout_data, selected_map,
         aggregate, population_enabled, population_colorscale,
         hospital_enabled, hospital_colorscale,
         covid_enabled, covid_count_type,
@@ -903,11 +795,30 @@ def build_updated_figures(
 ):
     """
     Build all figures for dashboard
+    Args:
+        - df: census 2010 dataset (cudf.DataFrame)
+        - df_hospitals: hospitals dataset (cudf.DataFrame)
+        - df_covid: covid dataset (cudf.DataFrame)
+        - relayout_data: plotly relayout object(dict) for datashader figure
+        - selected_map: selected_map dictionary object from plotly box-select
+        - aggregate: aggregate function (str)
+        - aggregate_column: aggregate column (census column name)
+        - population_enabled: Bool
+        - population_colorscale: colorscale name (str)
+        - hospital_enabled: Bool
+        - hospital_colorscale: colorscale name (str)
+        - covid_enabled: Bool
+        - covid_count_type: count/count_cat
+        - data_3857
+        - data_center_3857
+        - data_4326
+        - data_center_4326
+        - coordinates_4326_backup
+        - position_backup        
 
     Returns:
         tuple of figures in the following order
-        (relayout_data, age_male_histogram, age_female_histogram,
-        n_selected_indicator)
+        (datashader_plot, n_selected_indicator, coordinates_4326_backup, position_backup)
     """
     colorscale_transform, aggregate_column = 'linear', 'age'
 
@@ -988,7 +899,7 @@ def build_updated_figures(
     datashader_plot = build_datashader_plot(
         df, aggregate,
         aggregate_column, new_coordinates, position, x_range, y_range,
-        df_hospitals, df_covid, df_acs2018, population_enabled, population_colorscale,
+        df_hospitals, df_covid, population_enabled, population_colorscale,
         hospital_enabled, hospital_colorscale,
         covid_enabled, covid_count_type,
         colorscale_transform, selected_map
@@ -999,7 +910,7 @@ def build_updated_figures(
         x0, x1 = x_range_t
         y0, y1 = y_range_t
         if df_covid is not None:
-            df_covid = (df_covid[0], query_df(df_covid[1], x0, x1, y0, y1, 'Long_', 'Lat'), df_covid[2])
+            df_covid = (df_covid[0], query_df(df_covid[1], x0, x1, y0, y1, 'Long_', 'Lat'), df_covid[2], df_covid[3])
         if df_hospitals is not None:
             df_hospitals = query_df(df_hospitals, x0, x1, y0, y1, 'X', 'Y')
     # Build indicator figure
@@ -1029,11 +940,6 @@ def build_updated_figures(
 
     if df_covid is not None:
         n_selected_indicator['data'][0]['domain'] =  {'x': [0, 0.5], 'y': [0, 0.5]}
-        # x_range, y_range = zip(*coordinates_4326)
-        # x0, x1 = x_range
-        # y0, y1 = y_range
-        # query_expr_xy_hosp = f"(Long_ >= {x0}) & (Long_ <= {x1}) & (Lat >= {y0}) & (Lat <= {y1})"
-        # df_covid = df_covid[1].query(query_expr_xy_hosp).reset_index(drop=True)
         n_selected_indicator['data'].append({
             'title': {"text": "Total Cases"},
             'type': 'indicator',
@@ -1057,12 +963,7 @@ def build_updated_figures(
             n_selected_indicator['data'][1]['domain'] =  {'x': [0.26, 0.5], 'y': [0, 0.5]}
             domain_1 = {'x': [0.51, 0.75], 'y': [0, 0.5]}
             domain_2 = {'x': [0.76, 1], 'y': [0, 0.5]}
-            
-        # x_range, y_range = zip(*coordinates_4326)
-        # x0, x1 = x_range
-        # y0, y1 = y_range
-        # query_expr_xy_hosp = f"(X >= {x0}) & (X <= {x1}) & (Y >= {y0}) & (Y <= {y1})"
-        # df_hospitals = df_hospitals.query(query_expr_xy_hosp).reset_index(drop=True)
+
         n_selected_indicator['data'].append({
             'title': {"text": "Hospital Beds"},
             'type': 'indicator',
@@ -1095,6 +996,15 @@ def build_updated_figures(
     return (datashader_plot, n_selected_indicator, coordinates_4326_backup, position_backup)
 
 def generate_covid_bar_plots(df, scale_covid, category_covid):
+    """
+    Build all covid bar plots for dashboard
+    Args:
+        - df: covid dataset (cudf.DataFrame)
+        - scale_covid: log/linear
+        - category_covid: 0(Confirmed)/1(Deaths)
+    Returns:
+        12 by 5 - subplots figure
+    """
     df = df[0]
     states = df.Province_State.unique().tolist()
     for rem_state in ['Wuhan Evacuee','Diamond Princess','Recovered', 'Grand Princess']:
@@ -1105,7 +1015,7 @@ def generate_covid_bar_plots(df, scale_covid, category_covid):
     index = 0
     for state in states:
         df_temp = df.query('Province_State == @state').reset_index(drop=True)
-        if(category_covid == 'Total cases'):
+        if(category_covid == 0):
             fig.add_trace(go.Scatter(x=df_temp.Last_Update, y=df_temp.Confirmed, name='Confirmed', marker=dict(color='#c724e5'), hoverinfo='text', hovertemplate='Confirmed: <b>%{text}</b><extra></extra>', text=df_temp.Confirmed), row=int(index/5) + 1, col=int(index%5)+1)
         else:
             fig.add_trace(go.Scatter(x=df_temp.Last_Update, y=df_temp.Deaths, name='Deaths', marker=dict(color='#b7b7b7'), hoverinfo='text', hovertemplate='Deaths: <b>%{text}</b><extra></extra>', text=df_temp.Deaths), row=int(index/5) + 1, col=int(index%5)+1)
@@ -1120,17 +1030,26 @@ def generate_covid_bar_plots(df, scale_covid, category_covid):
     return fig
 
 def get_covid_bar_chart(df, scale_covid, category_covid):
+    """
+    Build all covid bar plots for dashboard
+    Args:
+        - df: covid dataset (cudf.DataFrame)
+        - scale_covid: log/linear
+        - category_covid: 0(Confirmed)/1(Deaths)
+    Returns:
+        12 by 5 - subplots figure
+    """
     global cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4
 
-    if scale_covid == 'linear' and category_covid == 'Total cases':
+    if scale_covid == 'linear' and category_covid == 0: #Total Cases
         if cache_fig_1 is None:
             cache_fig_1 = generate_covid_bar_plots(df, scale_covid, category_covid)
         return cache_fig_1
-    elif scale_covid == 'linear' and category_covid == 'Total deaths':
+    elif scale_covid == 'linear' and category_covid == 1: #Total Deaths
         if cache_fig_2 is None:
             cache_fig_2 = generate_covid_bar_plots(df, scale_covid, category_covid)
         return cache_fig_2
-    elif scale_covid == 'log' and category_covid == 'Total cases':
+    elif scale_covid == 'log' and category_covid == 0: #Total Cases
         if cache_fig_3 is None:
             cache_fig_3 = generate_covid_bar_plots(df, scale_covid, category_covid)
         return cache_fig_3
@@ -1191,15 +1110,11 @@ def register_update_plots_callback(client):
         df_d = client.get_dataset('c_df_d')
         df_hospitals = None
         df_covid = None
-        df_acs2018 = None
         
         if reset_map is not None and reset_map>reset_map_g:
             selected_map = None
             reset_map_g = reset_map
 
-        if covid_count_type == 2:
-            df_acs2018 = client.get_dataset('c_acs_2018')
-        
         if hospital_enabled:
             df_hospitals = client.get_dataset('pd_hospitals')
         
@@ -1211,7 +1126,7 @@ def register_update_plots_callback(client):
             data_3857, data_center_3857, data_4326, data_center_4326 = projections.compute()
 
         figures_d = delayed(build_updated_figures)(
-            df_d, df_hospitals, df_covid, df_acs2018, relayout_data, selected_map, 'count_cat',
+            df_d, df_hospitals, df_covid, relayout_data, selected_map, 'count_cat',
             population_enabled, population_colorscale,
             hospital_enabled, hospital_colorscale,
             covid_enabled, covid_count_type,
@@ -1284,9 +1199,8 @@ def publish_dataset_to_cluster():
         c_df_d = delayed(load_dataset)(census_data_path).persist()
         # pandas DataFrame
         # pd_df_d = delayed(c_df_d.to_pandas)().persist()
-        pd_covid = delayed(load_covid)(covid_data_path).persist()
+        pd_covid = delayed(load_covid)(covid_data_path, acs2018_data_path).persist()
         pd_hospitals = delayed(load_hospitals)(hospital_path).persist()
-        c_acs_2018 = delayed(load_dataset(acs2018_data_path)).persist()
 
         # Unpublish datasets if present
         for ds_name in ['pd_df_d', 'c_df_d', 'pd_states_last_5_days', 'pd_states_today', 'pd_hospitals', 'c_acs_2018']:
@@ -1297,7 +1211,6 @@ def publish_dataset_to_cluster():
         # client.publish_dataset(pd_df_d=pd_df_d)
         client.publish_dataset(c_df_d=c_df_d)
         client.publish_dataset(pd_covid=pd_covid)
-        client.publish_dataset(c_acs_2018=c_acs_2018)
         client.publish_dataset(pd_hospitals=pd_hospitals)
 
     load_and_publish_dataset()
