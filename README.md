@@ -29,7 +29,9 @@ For more information on how the Census and ACS data was prepared to show individ
 # setup directory
 cd plotly_demo
 
-# setup conda environment 
+# create .mapbox_token
+
+# setup conda environment ( root )
 conda env create --name plotly_env --file environment.yml
 source activate plotly_env
 
@@ -47,7 +49,12 @@ Verify the following arguments in the Dockerfile match your system:
 The most up to date OS and CUDA versions supported can be found here: [RAPIDS requirements](https://rapids.ai/start.html#req)
 
 ```bash
-# build
+# setup directory
+cd plotly_demo
+
+# create .mapbox_token
+
+# build ( root )
 docker build -t plotly_demo .
 
 # run and access via: http://localhost:8050 / http://ip_address:8050 / http://0.0.0.0:8050
@@ -122,7 +129,7 @@ Create an [Issue](https://github.com/rapidsai/plotly-dash-rapids-census-demo/iss
 ## Acknowledgments and Data Sources
 
 - 2010 Population Census and 2018 ACS data used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](www.nhgis.org) ( not for redistribution )
-- Hospital data is from [HIFLD](https://hifld-geoplatform.opendata.arcgis.com/datasets/hospitals) (10/7/2019) and does not contain emergency field hospitals
+- Hospital data is from [HIFLD](https://hifld-geoplatform.opendata.arcgis.com/datasets/hospitals) (10.7.2019) and does not contain emergency field hospitals
 - COVID-19 data is from the [Johns Hopkins University](https://coronavirus.jhu.edu/) data on [GitHub](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) (updated daily)
 - Base map layer provided by [mapbox](https://www.mapbox.com/)
 - Dashboard developed with Plot.ly [Dash](https://dash.plotly.com/)
