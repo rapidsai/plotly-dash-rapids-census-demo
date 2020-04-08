@@ -109,7 +109,7 @@ docker run --gpus all -d -p 8050:8050 plotly_demo
 **The dashboard stop responding or the chart data disappeared!** Try using the 'clear selections' button. If that does not work, refresh the page, or in the worst case restart the application. 
 
 
-**How do I request a feature or report a bug?** Create an [Issue](https://github.com/rapidsai/plotly-dash-rapids-census-demo/issues), or ping on on this [Covid-19 Slack Channel](https://join.slack.com/t/rapids-goai/shared_invite/zt-2qmkjvzl-K3rVHb1rZYuFeczoR9e4EA) and we will get to it asap. 
+**How do I request a feature or report a bug?** Create an [Issue](https://github.com/rapidsai/plotly-dash-rapids-census-demo/issues), or ping us on this [Covid-19 Slack Channel](https://join.slack.com/t/rapids-goai/shared_invite/zt-2qmkjvzl-K3rVHb1rZYuFeczoR9e4EA) and we will get to it asap. 
 
 
 ## Acknowledgments and Data Sources
