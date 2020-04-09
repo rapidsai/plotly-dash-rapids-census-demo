@@ -66,9 +66,7 @@ if not token:
 cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4 = None, None, None, None
 data_center_3857, data_3857, data_4326, data_center_4326 = [], [], [], []
 coordinates_4326_backup, position_backup = None, None
-reset_map_g = 0
-
-
+relayout_data_backup = None
 def load_dataset(path):
     """
     Args:
@@ -273,15 +271,11 @@ app.layout = html.Div(children=[
                         """
                     ),
                 ], className="container_title"),
-
-                dcc.Loading(
-                    dcc.Graph(
+                   dcc.Graph(
                         id='indicator-graph',
                         figure=blank_fig(row_heights[5]),
                         config={'displayModeBar': False},
-                    ),
-                    style={'height': row_heights[5]},
-                )
+                    )
             ],  style={'height': row_heights[0]}, className='seven columns pretty_container', id="indicator-div"),
             html.Div(children=[
                 html.H4([
@@ -542,7 +536,7 @@ def build_datashader_plot(
                 'showlegend': False
             }
     }
-    if population_enabled:
+    if population_enabled and len(df) > 0:
         global data_3857, data_center_3857, data_4326, data_center_4326
 
         datashader_color_scale = {}
@@ -656,13 +650,10 @@ def build_datashader_plot(
         map_graph['layout']['mapbox'].update({'layers': layers})
     map_graph['layout']['mapbox'].update(position)
     selected_points = {}
-    # selected_points = {
-    #         'selectedpoints': False
-    # }
-    # if selected_map is not None:
-    #     selected_points = {
-    #         'selectedpoints': selected_map['points']
-    #     }    
+    if selected_map is None:
+        selected_points = {
+                'selectedpoints': False
+        }
     
     if df_hospitals is not None and isinstance(df_hospitals, pd.DataFrame):
         map_graph['data'].append(
@@ -730,7 +721,7 @@ def build_datashader_plot(
                 'customdata': np.vstack([df_covid_yesterday.Confirmed.to_array(), df_covid.Confirmed.to_array()]).T
             }
             factor = 'Cases as of: <br>'+yesterday+': <b>%{customdata[0]}</b> <br>'+today+': %{customdata[1]} <br>Increase: <b> %{text} %</b> <br>'
-            sizeref = size_markers.max()/200
+            sizeref = 15
 
         elif covid_count_type == 2:
             size_markers = np.nan_to_num(df_covid_county_ratio.Confirmed.to_array()/(df_covid_county_ratio.acs2018_population.to_array()/1000)).astype('float')
@@ -831,18 +822,11 @@ def build_updated_figures(
         ]
     coordinates_4326 = relayout_data and relayout_data.get('mapbox._derived', {}).get('coordinates', None)
     dragmode = relayout_data and 'dragmode' in relayout_data and coordinates_4326_backup is not None
-    zoommode = relayout_data and 'mapbox.zoom' in relayout_data and coordinates_4326 is None and position_backup is not None
 
     if dragmode:
         coordinates_4326 = coordinates_4326_backup
         coordinates_3857 = epsg_4326_to_3857(coordinates_4326)
         position = position_backup
-    elif zoommode:
-        position = position_backup
-        position['zoom'] = relayout_data['mapbox.zoom']
-        coordinates_3857 = data_3857
-        coordinates_4326 = data_4326
-
     elif coordinates_4326:
         lons, lats = zip(*coordinates_4326)
         lon0, lon1 = max(min(lons), data_4326[0][0]), min(max(lons), data_4326[1][0])
@@ -893,7 +877,6 @@ def build_updated_figures(
         x0, x1 = x_range_t
         y0, y1 = y_range_t
         df = query_df(df, x0, x1, y0, y1, 'x', 'y')
-        
         
     
     datashader_plot = build_datashader_plot(
@@ -1080,24 +1063,36 @@ def register_update_plots_callback(client):
     Args:
         df_d: Dask.delayed pandas or cudf DataFrame
     """
+
+    # Clear/reset button callbacks
     @app.callback(
-        [Output('indicator-graph', 'figure'), Output('map-graph', 'figure'), Output('map-graph', 'config')
-         ],
-        [Input('map-graph', 'relayoutData'), Input('map-graph', 'selectedData'),
+        Output('map-graph', 'selectedData'),
+        [Input('reset-map', 'n_clicks')]
+    )
+    def clear_map(*args):
+        return None
+
+
+    @app.callback(
+        [
+            Output('indicator-graph', 'figure'), Output('map-graph', 'figure'),
+            Output('map-graph', 'config')
+        ],
+        [
+            Input('map-graph', 'relayoutData'), Input('map-graph', 'selectedData'),
             Input('population-toggle', 'on'), Input('colorscale-dropdown-population', 'value'), 
             Input('hospital-toggle', 'on'), Input('colorscale-dropdown-hospital', 'value'),
             Input('covid-toggle', 'on'), Input('covid_count_type', 'value'),
-            Input('reset-map', 'n_clicks')
         ]
     )
     def update_plots(
             relayout_data, selected_map,
             population_enabled, population_colorscale,
             hospital_enabled, hospital_colorscale,
-            covid_enabled, covid_count_type,
-            reset_map
+            covid_enabled, covid_count_type
     ):
-        global data_3857, data_center_3857, data_4326, data_center_4326, covid_last_update_time, coordinates_4326_backup, position_backup, reset_map_g
+        global data_3857, data_center_3857, data_4326, data_center_4326, covid_last_update_time, coordinates_4326_backup, position_backup
+        
         if int(time.time() - covid_last_update_time) > 21600:
             # update covid data every six hours
             update_covid_data(client)
@@ -1110,10 +1105,6 @@ def register_update_plots_callback(client):
         df_d = client.get_dataset('c_df_d')
         df_hospitals = None
         df_covid = None
-        
-        if reset_map is not None and reset_map>reset_map_g:
-            selected_map = None
-            reset_map_g = reset_map
 
         if hospital_enabled:
             df_hospitals = client.get_dataset('pd_hospitals')
