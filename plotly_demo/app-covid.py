@@ -654,6 +654,10 @@ def build_datashader_plot(
         selected_points = {
                 'selectedpoints': False
         }
+    else:
+        selected_points = {
+            'selectedpoints': [i['pointIndex'] for i in selected_map['points']]
+        }
     
     if df_hospitals is not None and isinstance(df_hospitals, pd.DataFrame):
         map_graph['data'].append(
