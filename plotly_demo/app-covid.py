@@ -720,6 +720,7 @@ def build_datashader_plot(
             size_markers = (np.nan_to_num((size_markers - df_covid_yesterday.Confirmed.to_array())*100/size_markers_yesterday)).astype('int64')
             size_markers_labels = np.copy(size_markers)
             size_markers = np.absolute(size_markers)
+            size_markers[size_markers>1000] = 1000
             annotations = {
                 'text': size_markers_labels,
                 'customdata': np.vstack([df_covid_yesterday.Confirmed.to_array(), df_covid.Confirmed.to_array()]).T
@@ -1168,9 +1169,10 @@ def check_dataset(dataset_url, data_path):
 def update_covid_data(client):
     global cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4
     covid_data_path = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/%s.csv'
+    acs2018_data_path = "../data/acs2018_county_population.parquet"
     print("Updating Covid data")
     cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4 = None, None, None, None            
-    pd_covid = delayed(load_covid)(covid_data_path).persist()
+    pd_covid = delayed(load_covid)(covid_data_path, acs2018_data_path).persist()
     client.unpublish_dataset('pd_covid')
     client.publish_dataset(pd_covid=pd_covid)
 
