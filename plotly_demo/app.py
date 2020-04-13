@@ -200,6 +200,7 @@ mappings['income'] = {
 
 data_center_3857, data_3857, data_4326, data_center_4326 = [], [], [], []
 
+
 def load_dataset(path):
     """
     Args:
@@ -279,11 +280,6 @@ app.layout = html.Div(children=[
     html.Div(children=[
         html.Div(children=[
             html.Div(children=[
-                html.Div(children=[
-                    html.Button(
-                        "Clear All Selections", id='clear-all', className='reset-button'
-                    ),
-                ]),
                 html.H4([
                     "Population Count",
                 ], className="container_title"),
@@ -297,6 +293,11 @@ app.layout = html.Div(children=[
                 )
             ], className='six columns pretty_container', id="indicator-div"),
             html.Div(children=[
+                html.Div(children=[
+                    html.Button(
+                        "Clear All Selections", id='clear-all', className='reset-button'
+                    ),
+                ]),
                 html.H4([
                     "Options",
                 ], className="container_title"),
@@ -360,8 +361,6 @@ app.layout = html.Div(children=[
                             searchable=False,
                             clearable=False,
                         )),
-                        
-                        
                     ]),
                 ], style={'width': '100%', 'height': f'{row_heights[0]}px'}),
             ], className='six columns pretty_container', id="config-div"),
@@ -391,7 +390,7 @@ app.layout = html.Div(children=[
                 id='scatter-graph',
                 figure=blank_fig(row_heights[1]),
             ),
-            
+
         ], className='twelve columns pretty_container',
             style={
                 'width': '98%',
@@ -408,7 +407,7 @@ app.layout = html.Div(children=[
                     html.H4([
                         "Age Distribution",
                     ], className="container_title"),
-                    
+
                     dcc.Graph(
                         id='age-histogram',
                         config={'displayModeBar': False},
