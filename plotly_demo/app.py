@@ -331,7 +331,7 @@ app.layout = html.Div(children=[
                             id='colorscale-dropdown',
                             options=[
                                 {'label': cs, 'value': cs}
-                                for cs in ['Viridis', 'Cividis', 'Inferno', 'Magma', 'Plasma']
+                                for cs in ['Viridis', 'Cividis', 'Magma']
                             ],
                             value='Viridis',
                             searchable=False,
