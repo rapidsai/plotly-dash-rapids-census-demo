@@ -32,7 +32,7 @@ cupy.cuda.set_allocator(None)
 bgcolor = "#191a1a"  # mapbox dark map land color
 text_color = "#cfd8dc"  # Material blue-grey 100
 mapbox_land_color = "#343332"
-
+coordinates_4326_backup, position_backup = [], []
 # Figure template
 row_heights = [150, 440, 200]
 template = {
@@ -273,7 +273,7 @@ app.layout = html.Div(children=[
                     src="assets/dash-logo.png",
                     style={'float': 'right', 'height': '50px', 'margin-right': '2%'}
                 ), href="https://dash.plot.ly/"),
-            
+  
         ], style={'text-align': 'left'}),
     ]),
     html.Div(children=[
@@ -313,10 +313,6 @@ app.layout = html.Div(children=[
                             color='#00cc96',
                             id='gpu-toggle',
                         ))),
-                        # html.Td(html.Button(
-                        #     "Reset GPU", id='reset-gpu', style={'width': '100%'}
-                        # )),
-                        # html.Div(id='reset-gpu-complete', style={'display': 'hidden'})
                     ]),
                     html.Tr([
                         html.Td(html.Div("Color by"), className="config-label"),
@@ -444,26 +440,9 @@ app.layout = html.Div(children=[
     ),
 ])
 
-# # Register callbacks
-# @app.callback(
-#     [Output('aggregate-col-dropdown', 'options'),
-#      Output('aggregate-col-dropdown', 'disabled')],
-#     [Input('sex-dropdown', 'value')]
-# )
-# def update_agg_col_dropdown(agg):
-#     if agg == 'count':
-#         options = [{'label': 'NA',
-#                     'value': 'NA'}]
-#         disabled = True
-#     else:
-#         options = [{'label': v, 'value': k} for k, v in column_labels.items()]
-#         disabled = False
-#     return options, disabled
-
-
 # Clear/reset button callbacks
 @app.callback(
-    Output('map-graph', 'relayoutData'),
+    Output('map-graph', 'selectedData'),
     [Input('reset-map', 'n_clicks'), Input('clear-all', 'n_clicks')]
 )
 def clear_map(*args):
@@ -885,8 +864,9 @@ def build_histogram_default_bins(df, column, selections, query_cache, orientatio
 
 
 def build_updated_figures(
-        df, relayout_data, selected_age, selected_scatter_graph,
-        aggregate, colorscale_name, selected_cow, selected_sex
+        df, relayout_data, selected_map, selected_age, selected_scatter_graph,
+        aggregate, colorscale_name, selected_cow, selected_sex,
+        coordinates_4326_backup, position_backup
 ):
     """
     Build all figures for dashboard
@@ -954,19 +934,23 @@ def build_updated_figures(
             isin_mask2 |= array_module.isin(schl_array, zips_chunk)
 
         isin_mask_scatter = array_module.logical_and(isin_mask1, isin_mask2)
-        df_scatter = df[isin_mask_scatter]
+        df = df[isin_mask_scatter]
     else:
         selected_pincp = None
         selected_schl = None
-        df_scatter = df
     
     # if relayout_data is not None:
     transformer_4326_to_3857 = Transformer.from_crs("epsg:4326", "epsg:3857")
     def epsg_4326_to_3857(coords):
         return [transformer_4326_to_3857.transform(*reversed(row)) for row in coords]
     coordinates_4326 = relayout_data and relayout_data.get('mapbox._derived', {}).get('coordinates', None)
+    dragmode = relayout_data and 'dragmode' in relayout_data and coordinates_4326_backup is not None
 
-    if coordinates_4326:
+    if dragmode:
+        coordinates_4326 = coordinates_4326_backup
+        coordinates_3857 = epsg_4326_to_3857(coordinates_4326)
+        position = position_backup
+    elif coordinates_4326:
         lons, lats = zip(*coordinates_4326)
         lon0, lon1 = max(min(lons), data_4326[0][0]), min(max(lons), data_4326[1][0])
         lat0, lat1 = max(min(lats), data_4326[0][1]), min(max(lats), data_4326[1][1])
@@ -975,11 +959,14 @@ def build_updated_figures(
             [lon1, lat1],
         ]
         coordinates_3857 = epsg_4326_to_3857(coordinates_4326)
+        coordinates_4326_backup = coordinates_4326
 
         position = {
             'zoom': relayout_data.get('mapbox.zoom', None),
             'center': relayout_data.get('mapbox.center', None)
         }
+        position_backup = position
+
     else:
         position = {
             'zoom': 2.5,
@@ -1002,15 +989,28 @@ def build_updated_figures(
     x0, x1 = x_range
     y0, y1 = y_range
 
-    # Build query expressions
-    query_expr_xy = f"(x >= {x0}) & (x <= {x1}) & (y >= {y0}) & (y <= {y1})"
-    df_map = df_scatter.query(query_expr_xy)
+    def query_df(df, x0, x1, y0, y1, x, y):
+        mask_ = (df[x]>=x0) & (df[x]<=x1) & (df[y]<=y0) & (df[y]>=y1)
+        if(mask_.sum() != len(df)):
+            df = df[mask_]
+            df.index = cudf.core.RangeIndex(0,len(df))
+        del(mask_)
+        return df
+        
+    if selected_map is not None:
+        coordinates_4326 = selected_map['range']['mapbox']
+        coordinates_3857 = epsg_4326_to_3857(coordinates_4326)
+        x_range_t, y_range_t = zip(*coordinates_3857)
+        x0, x1 = x_range_t
+        y0, y1 = y_range_t
+        df = query_df(df, x0, x1, y0, y1, 'x', 'y')
 
     datashader_plot = build_datashader_plot(
-        df_scatter.query(all_hists_query) if all_hists_query else df_scatter, aggregate,
+        df.query(all_hists_query) if all_hists_query else df, aggregate,
         aggregate_column, colorscale_name, colorscale_transform, new_coordinates, position, x_range, y_range)
 
-    df_hists = df_map.query(all_hists_query) if all_hists_query else df_map
+    df_hists = df.query(all_hists_query) if all_hists_query else df
+
     # Build indicator figure
     n_selected_indicator = {
         'data': [{
@@ -1035,13 +1035,13 @@ def build_updated_figures(
     query_cache = {}
 
 
-    if isinstance(df_map, cudf.DataFrame):
-        df_map = df_map.groupby('age')['x'].count().to_pandas()
+    if isinstance(df, cudf.DataFrame):
+        df = df.groupby('age')['x'].count().to_pandas()
     else:
-        df_map = df_map.groupby('age')['x'].count()
+        df = df.groupby('age')['x'].count()
 
     age_histogram = build_histogram_default_bins(
-        df_map, 'age', selected, query_cache,'v', colorscale_name, colorscale_transform, aggregate, aggregate_column
+        df, 'age', selected, query_cache,'v', colorscale_name, colorscale_transform, aggregate, aggregate_column
     )
     
     
@@ -1071,7 +1071,8 @@ def build_updated_figures(
         }
 
     return (datashader_plot, age_histogram, scatter_graph,
-        n_selected_indicator,)
+        n_selected_indicator,coordinates_4326_backup, position_backup
+    )
 
 
 def register_update_plots_callback(client):
@@ -1082,20 +1083,22 @@ def register_update_plots_callback(client):
     """
     @app.callback(
         [Output('indicator-graph', 'figure'), Output('map-graph', 'figure'),
-         Output('age-histogram', 'figure'), Output('scatter-graph', 'figure')
+         Output('age-histogram', 'figure'), Output('scatter-graph', 'figure'),
+         Output('map-graph', 'config')
          ],
-        [Input('map-graph', 'relayoutData'), Input('age-histogram', 'selectedData'),
-            Input('scatter-graph', 'selectedData'),
+        [
+            Input('map-graph', 'relayoutData'), Input('map-graph', 'selectedData'),
+            Input('age-histogram', 'selectedData'), Input('scatter-graph', 'selectedData'),
             Input('aggregate-dropdown', 'value'), Input('colorscale-dropdown', 'value'),
             Input('cow-dropdown', 'value'), Input('sex-dropdown', 'value'),
             Input('gpu-toggle', 'on')
         ]
     )
     def update_plots(
-            relayout_data, selected_age, selected_scatter_graph,
+            relayout_data, selected_map, selected_age, selected_scatter_graph,
             aggregate, colorscale_name, selected_cow, selected_sex, gpu_enabled
     ):
-        global data_3857, data_center_3857, data_4326, data_center_4326
+        global data_3857, data_center_3857, data_4326, data_center_4326, coordinates_4326_backup, position_backup
 
         t0 = time.time()
 
@@ -1111,18 +1114,23 @@ def register_update_plots_callback(client):
             data_3857, data_center_3857, data_4326, data_center_4326 = projections.compute()
 
         figures_d = delayed(build_updated_figures)(
-            df_d, relayout_data, selected_age, selected_scatter_graph,
-            aggregate, colorscale_name, selected_cow, selected_sex
+            df_d, relayout_data, selected_map, selected_age, selected_scatter_graph,
+            aggregate, colorscale_name, selected_cow, selected_sex,
+            coordinates_4326_backup, position_backup
         )
 
         figures = figures_d.compute()
 
         (datashader_plot, age_histogram, scatter_graph,
-        n_selected_indicator,) = figures
+        n_selected_indicator, coordinates_4326_backup, position_backup) = figures
 
         print(f"Update time: {time.time() - t0}")
         return (
-            n_selected_indicator, datashader_plot, age_histogram, scatter_graph
+            n_selected_indicator, datashader_plot, age_histogram, scatter_graph,
+            {
+                'displayModeBar':True,
+                'modeBarButtonsToRemove': ['lasso2d', 'zoomInMapbox', 'zoomOutMapbox', 'toggleHover']
+            }
         )
 
 def check_dataset(dataset_url, data_path):
@@ -1184,19 +1192,6 @@ def publish_dataset_to_cluster():
     # Precompute field bounds
     c_df_d = client.get_dataset('c_df_d')
     
-    # Define callback to restart cluster and reload datasets
-    # @app.callback(
-    #     Output('reset-gpu-complete', 'children'),
-    #     [Input('reset-gpu', 'n_clicks')]
-    # )
-    # def restart_cluster(n_clicks):
-    #     if n_clicks:
-    #         print("Restarting LocalCUDACluster")
-    #         client.unpublish_dataset('pd_df_d')
-    #         client.unpublish_dataset('c_df_d')
-    #         client.restart()
-    #         load_and_publish_dataset()
-
     # Register top-level callback that updates plots
     register_update_plots_callback(client)
 
