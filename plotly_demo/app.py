@@ -262,7 +262,7 @@ app = dash.Dash(__name__)
 app.layout = html.Div(children=[
     html.Div([
         html.H1(children=[
-            'Census Data',
+            'Census 2010 Visualization',
             html.A(
                 html.Img(
                     src="https://camo.githubusercontent.com/38ca5c5f7d6afc09f8d50fd88abd4b212f0a6375/68747470733a2f2f7261706964732e61692f6173736574732f696d616765732f7261706964735f6c6f676f2e706e67",
@@ -285,7 +285,7 @@ app.layout = html.Div(children=[
                     ),
                 ]),
                 html.H4([
-                    "Selected Polpulation",
+                    "Population Count",
                 ], className="container_title"),
                 dcc.Loading(
                     dcc.Graph(
@@ -298,7 +298,7 @@ app.layout = html.Div(children=[
             ], className='six columns pretty_container', id="indicator-div"),
             html.Div(children=[
                 html.H4([
-                    "Configuration",
+                    "Options",
                 ], className="container_title"),
                 html.Table([
                     html.Col(style={'width': '100px'}),
@@ -369,7 +369,7 @@ app.layout = html.Div(children=[
         html.Div(children=[
             html.Button("Clear Selection", id='reset-map', className='reset-button'),
             html.H4([
-                "US Population(each individual)",
+                "Population Distribution of Individuals",
             ], className="container_title"),
             dcc.Graph(
                 id='map-graph',
@@ -385,7 +385,7 @@ app.layout = html.Div(children=[
         html.Div(children=[
             html.Button("Clear Selection", id='reset-scatter', className='reset-button'),
             html.H4([
-                "Education - Income distribution",
+                "Education Levels by Income Distribution",
             ], className="container_title"),
             dcc.Graph(
                 id='scatter-graph',
@@ -406,7 +406,7 @@ app.layout = html.Div(children=[
                         "Clear Selection", id='clear-age', className='reset-button'
                     ),
                     html.H4([
-                        "Age",
+                        "Age Distribution",
                     ], className="container_title"),
                     
                     dcc.Graph(
@@ -422,13 +422,14 @@ app.layout = html.Div(children=[
     ]),
     html.Div(
         [
-            html.H4('Acknowledgements', style={"margin-top": "0"}),
+            html.H4('Acknowledgements and Data Sources', style={"margin-top": "0"}),
             dcc.Markdown('''\
- - Dashboard written in Python using the [Dash](https://dash.plot.ly/) web framework.
- - GPU accelerated provided by the [cudf](https://github.com/rapidsai/cudf) and
- [cupy](https://cupy.chainer.org/) libraries.
- - Base map layer is the ["dark" map style](https://www.mapbox.com/maps/light-dark/)
- provided by [mapbox](https://www.mapbox.com/).
+- 2010 Population Census and 2018 ACS data used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](https://www.nhgis.org/) ( not for redistribution )
+- Base map layer provided by mapbox
+- Dashboard developed with Plot.ly Dash
+- Geospatial point rendering developed with Datashader
+- GPU accelerated with RAPIDS cudf and cupy libraries. CPU using pandas libraries.
+- For source code visit our GitHub
 '''),
         ],
         style={
