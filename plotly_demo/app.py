@@ -34,7 +34,7 @@ text_color = "#cfd8dc"  # Material blue-grey 100
 mapbox_land_color = "#343332"
 coordinates_4326_backup, position_backup = [], []
 # Figure template
-row_heights = [150, 440, 200]
+row_heights = [150, 440, 200, 540]
 template = {
     'layout': {
         'paper_bgcolor': bgcolor,
@@ -388,7 +388,7 @@ app.layout = html.Div(children=[
             ], className="container_title"),
             dcc.Graph(
                 id='scatter-graph',
-                figure=blank_fig(row_heights[1]),
+                figure=blank_fig(row_heights[3]),
             ),
 
         ], className='twelve columns pretty_container',
