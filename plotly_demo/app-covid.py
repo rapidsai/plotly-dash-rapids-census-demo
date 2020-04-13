@@ -731,11 +731,12 @@ def build_datashader_plot(
         elif covid_count_type == 2:
             size_markers = np.nan_to_num(df_covid_county_ratio.Confirmed.to_array()/(df_covid_county_ratio.acs2018_population.to_array()/1000)).astype('float')
             size_markers_labels = np.around(size_markers, 2)
+            size_markers[size_markers>35] = 35
             annotations = {
                 'text': size_markers_labels
             }
             factor = 'Population Data from 2018 ACS <br>Cases Per 1000 People: <b> %{text} </b> <br>'
-            sizeref = 5/(size_markers.max())
+            sizeref = 0.3
         
         marker_border = 2*sizeref
         size_markers[size_markers >= np.percentile(size_markers, 99.9)] = np.percentile(size_markers, 99.9)
