@@ -313,10 +313,10 @@ app.layout = html.Div(children=[
                             color='#00cc96',
                             id='gpu-toggle',
                         ))),
-                        html.Td(html.Button(
-                            "Reset GPU", id='reset-gpu', style={'width': '100%'}
-                        )),
-                        html.Div(id='reset-gpu-complete', style={'display': 'hidden'})
+                        # html.Td(html.Button(
+                        #     "Reset GPU", id='reset-gpu', style={'width': '100%'}
+                        # )),
+                        # html.Div(id='reset-gpu-complete', style={'display': 'hidden'})
                     ]),
                     html.Tr([
                         html.Td(html.Div("Color by"), className="config-label"),
@@ -1185,17 +1185,17 @@ def publish_dataset_to_cluster():
     c_df_d = client.get_dataset('c_df_d')
     
     # Define callback to restart cluster and reload datasets
-    @app.callback(
-        Output('reset-gpu-complete', 'children'),
-        [Input('reset-gpu', 'n_clicks')]
-    )
-    def restart_cluster(n_clicks):
-        if n_clicks:
-            print("Restarting LocalCUDACluster")
-            client.unpublish_dataset('pd_df_d')
-            client.unpublish_dataset('c_df_d')
-            client.restart()
-            load_and_publish_dataset()
+    # @app.callback(
+    #     Output('reset-gpu-complete', 'children'),
+    #     [Input('reset-gpu', 'n_clicks')]
+    # )
+    # def restart_cluster(n_clicks):
+    #     if n_clicks:
+    #         print("Restarting LocalCUDACluster")
+    #         client.unpublish_dataset('pd_df_d')
+    #         client.unpublish_dataset('c_df_d')
+    #         client.restart()
+    #         load_and_publish_dataset()
 
     # Register top-level callback that updates plots
     register_update_plots_callback(client)
