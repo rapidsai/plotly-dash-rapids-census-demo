@@ -770,7 +770,10 @@ def scatter_bubble_2d(df, columnx, columny, selections, query_cache, colorscale_
 
     return fig
 
-def build_histogram_default_bins(df, column, selections, query_cache, orientation,colorscale_name, colorscale_transform, aggregate, aggregate_column):
+def build_histogram_default_bins(
+    df, column, selections, query_cache, orientation,
+    colorscale_name, colorscale_transform, aggregate, aggregate_column
+):
     """
     Build histogram figure
 
@@ -790,9 +793,8 @@ def build_histogram_default_bins(df, column, selections, query_cache, orientatio
     marker = {'color': text_color}
     if aggregate == 'count_cat' and column == aggregate_column:
         colorscale = [clr for v, clr in zip(mappings[aggregate_column].keys(), colors[aggregate_column])]
-        marker = {'color': colorscale}
 
-    range_ages = [20,40,60,84, 85]
+    range_ages = [20, 40, 60, 84, 85]
     colors_ages = ['#C700E5','#9D00DB', '#7300D2','#4900C8','#1F00BF']
     labels = ['0-20', '21-40', '41-60', '60-84', '85+']
     # centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
@@ -801,8 +803,7 @@ def build_histogram_default_bins(df, column, selections, query_cache, orientatio
             'data':[],
             'layout': {
                 'xaxis': {
-                    'type': 'log',
-                    'range': [0, 8],  # Up to 100M
+                    'type': 'linear',
                     'title': {
                         'text': "Count"
                     }
@@ -815,11 +816,10 @@ def build_histogram_default_bins(df, column, selections, query_cache, orientatio
         }
     else:
         fig = {
-            'data':[],
+            'data': [],
             'layout': {
                 'yaxis': {
-                    'type': 'log',
-                    'range': [0, 8],  # Up to 100M
+                    'type': 'linear',
                     'title': {
                         'text': "Count"
                     }
