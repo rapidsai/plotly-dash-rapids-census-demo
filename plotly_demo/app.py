@@ -266,7 +266,7 @@ app.layout = html.Div(children=[
             'Census 2010 Visualization',
             html.A(
                 html.Img(
-                    src="https://camo.githubusercontent.com/38ca5c5f7d6afc09f8d50fd88abd4b212f0a6375/68747470733a2f2f7261706964732e61692f6173736574732f696d616765732f7261706964735f6c6f676f2e706e67",
+                    src="assets/rapids-logo.png",
                     style={'float': 'right', 'height': '50px', 'margin-right': '2%'}
                 ), href="https://rapids.ai/"),
             html.A(
@@ -382,22 +382,65 @@ app.layout = html.Div(children=[
             id="map-div"
         ),
         html.Div(children=[
-            html.Button("Clear Selection", id='reset-scatter', className='reset-button'),
-            html.H4([
-                "Education Levels by Income Distribution",
-            ], className="container_title"),
-            dcc.Graph(
-                id='scatter-graph',
-                figure=blank_fig(row_heights[3]),
-            ),
+            html.Div(
+                children=[
+                    html.Button(
+                        "Clear Selection", id='clear-education', className='reset-button'
+                    ),
+                    html.H4([
+                        "Education Distribution",
+                    ], className="container_title"),
 
-        ], className='twelve columns pretty_container',
-            style={
-                'width': '98%',
-                'margin-right': '0',
-            },
-            id="scatter-div"
-        ),
+                    dcc.Graph(
+                        id='education-histogram',
+                        config={'displayModeBar': False},
+                        figure=blank_fig(row_heights[1]),
+                        animate=True
+                    ),
+                ],
+                className='twelve columns pretty_container', id="age-div"
+            )
+        ]),
+        html.Div(children=[
+            html.Div(
+                children=[
+                    html.Button(
+                        "Clear Selection", id='clear-income', className='reset-button'
+                    ),
+                    html.H4([
+                        "Income Distribution",
+                    ], className="container_title"),
+
+                    dcc.Graph(
+                        id='income-histogram',
+                        config={'displayModeBar': False},
+                        figure=blank_fig(row_heights[1]),
+                        animate=True
+                    ),
+                ],
+                className='twelve columns pretty_container', id="age-div"
+            )
+        ]),
+        html.Div(children=[
+            html.Div(
+                children=[
+                    html.Button(
+                        "Clear Selection", id='clear-cow', className='reset-button'
+                    ),
+                    html.H4([
+                        "Class of Workers Distribution",
+                    ], className="container_title"),
+
+                    dcc.Graph(
+                        id='cow-histogram',
+                        config={'displayModeBar': False},
+                        figure=blank_fig(row_heights[1]),
+                        animate=True
+                    ),
+                ],
+                className='twelve columns pretty_container', id="age-div"
+            )
+        ]),
         html.Div(children=[
             html.Div(
                 children=[
@@ -456,10 +499,24 @@ def clear_age_hist_selections(*args):
     return None
 
 @app.callback(
-    Output('scatter-graph', 'selectedData'),
-    [Input('reset-scatter', 'n_clicks'), Input('clear-all', 'n_clicks')]
+    Output('education-histogram', 'selectedData'),
+    [Input('clear-education', 'n_clicks'), Input('clear-all', 'n_clicks')]
 )
-def clear_scatter_selections(*args):
+def clear_education_hist_selections(*args):
+    return None
+
+@app.callback(
+    Output('income-histogram', 'selectedData'),
+    [Input('clear-income', 'n_clicks'), Input('clear-all', 'n_clicks')]
+)
+def clear_income_hist_selections(*args):
+    return None
+
+@app.callback(
+    Output('cow-histogram', 'selectedData'),
+    [Input('clear-cow', 'n_clicks'), Input('clear-all', 'n_clicks')]
+)
+def clear_cow_hist_selections(*args):
     return None
 
 # Query string helpers
@@ -591,49 +648,6 @@ def build_datashader_plot(
         customdata = [None]
         marker = {}
         layers = []
-    # elif n_selected < 5000:
-    #     # Display each individual point using a scattermapbox trace. This way we can
-    #     # give each individual point a tooltip
-
-    #     ddf_gpu_small_expr = ' & '.join(
-    #         [query_expr_xy]
-    #     )
-    #     ddf_gpu_small = df.query(ddf_gpu_small_expr).to_pandas()
-
-    #     x, y, sex, edu, inc, cow = (
-    #         ddf_gpu_small.x, ddf_gpu_small.y, ddf_gpu_small.sex, ddf_gpu_small.education, ddf_gpu_small.income, ddf_gpu_small.cow
-    #     )
-
-    #     # Format creation date column for tooltip
-    #     # created = pd.to_datetime(created.tolist()).strftime('%x')
-
-
-    #     # Build array of the integer category codes to use as the numeric color array
-    #     # for the scattermapbox trace
-    #     sex_codes = sex.unique().tolist()
-
-    #     # Build marker properties dict
-    #     marker = {
-    #         'color': sex_codes,
-    #         'colorscale': colors[aggregate_column],
-    #         'cmin': 0,
-    #         'cmax': 3,
-    #         'size': 5,
-    #         'opacity': 0.6,
-    #     }
-    #     lat = list(zip(
-    #         x.astype(str)
-    #     ))
-    #     lon = list(zip(
-    #         y.astype(str)
-    #     ))
-    #     customdata = list(zip(
-    #         sex.astype(str),
-    #         edu.astype(str),
-    #         inc.astype(str),
-    #         cow.astype(str)
-    #     ))
-    #     layers = []
     else:
         # Shade aggregation into an image that we can add to the map as a mapbox
         # image layer
