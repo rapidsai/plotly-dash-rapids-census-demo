@@ -13,7 +13,7 @@ import dash
 import dash_core_components as dcc
 import dash_dangerously_set_inner_html
 import dash_html_components as html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import dash_daq as daq
 from plotly.colors import sequential
 from pyproj import Transformer
@@ -373,6 +373,9 @@ app.layout = html.Div(children=[
                 config={'displayModeBar': False},
                 figure=blank_fig(row_heights[1]),
             ),
+            # Hidden div inside the app that stores the intermediate value
+            html.Div(id='intermediate-state-value', style={'display': 'none'})
+
         ], className='twelve columns pretty_container',
             style={
                 'width': '98%',
@@ -1078,26 +1081,34 @@ def register_update_plots_callback(client):
     def clear_map(*args):
         return None
 
-
     @app.callback(
         [
             Output('indicator-graph', 'figure'), Output('map-graph', 'figure'),
-            Output('map-graph', 'config')
+            Output('map-graph', 'config'), Output('intermediate-state-value', 'children')
         ],
         [
             Input('map-graph', 'relayoutData'), Input('map-graph', 'selectedData'),
             Input('population-toggle', 'on'), Input('colorscale-dropdown-population', 'value'), 
             Input('hospital-toggle', 'on'), Input('colorscale-dropdown-hospital', 'value'),
             Input('covid-toggle', 'on'), Input('covid_count_type', 'value'),
+        ],
+        [
+            State('intermediate-state-value', 'children')
         ]
     )
     def update_plots(
             relayout_data, selected_map,
             population_enabled, population_colorscale,
             hospital_enabled, hospital_colorscale,
-            covid_enabled, covid_count_type
+            covid_enabled, covid_count_type,
+            coordinates_backup
     ):
-        global data_3857, data_center_3857, data_4326, data_center_4326, covid_last_update_time, coordinates_4326_backup, position_backup
+        global data_3857, data_center_3857, data_4326, data_center_4326, covid_last_update_time
+
+        if coordinates_backup is not None:
+            coordinates_4326_backup, position_backup = coordinates_backup
+        else:
+            coordinates_4326_backup, position_backup = None, None
         
         if int(time.time() - covid_last_update_time) > 21600:
             # update covid data every six hours
@@ -1139,7 +1150,8 @@ def register_update_plots_callback(client):
             n_selected_indicator, datashader_plot, {
                 'displayModeBar':True,
                 'modeBarButtonsToRemove': ['lasso2d', 'zoomInMapbox', 'zoomOutMapbox', 'toggleHover']
-                }
+                }, 
+            (coordinates_4326_backup, position_backup)
         )
 
 def check_dataset(dataset_url, data_path):
