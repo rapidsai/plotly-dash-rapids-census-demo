@@ -7,6 +7,7 @@ dependencies:
   - plotly=4.5
   - cudf
   - dash=1.8
+  - dash-bootstrap-components
   - pandas=0.25.3
   - cudatoolkit=10.2
   - datashader=0.10
