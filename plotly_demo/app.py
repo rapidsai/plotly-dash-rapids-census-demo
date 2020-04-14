@@ -12,7 +12,7 @@ import datashader.transfer_functions as tf
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import dash_daq as daq
 from plotly.colors import sequential
 from pyproj import Transformer
@@ -32,7 +32,7 @@ cupy.cuda.set_allocator(None)
 bgcolor = "#191a1a"  # mapbox dark map land color
 text_color = "#cfd8dc"  # Material blue-grey 100
 mapbox_land_color = "#343332"
-coordinates_4326_backup, position_backup = [], []
+
 # Figure template
 row_heights = [150, 440, 200, 540]
 template = {
@@ -51,79 +51,13 @@ template = {
 
 colors = {}
 mappings = {}
-colors['sex'] = ['#0000FF', '#00ff00']
-colors['income'] = [
-    "#e0bb7f",
-    "#00b3b3",
-    "#ff748c",
-    "#a280ff",
-    "#ff8b61",
-    "#bd8ad4",
-    "#ffc874",
-    "#fff968",
-    "#93b6ff",
-    "#5a1df4",
-    "#0e3c17",
-    "#d1c9bd",
-    "#8cacc0",
-    "#93a753",
-    "#bada55",
-    "#d1c9bd",
-    "#d1c9bd",
-    "#707372",
-    "#e4002b",
-    "#403a60",
-    "#975c9f",
- ]
-colors['education'] = [
-    "#e0bb7f",
-    "#00b3b3",
-    "#ff748c",
-    "#a280ff",
-    "#ff8b61",
-    "#bd8ad4",
-    "#ffc874",
-    "#fff968",
-    "#93b6ff",
-    "#5a1df4",
-    "#0e3c17",
-    "#d1c9bd",
-    "#8cacc0",
-    "#93a753",
-    "#bada55",
-    "#d1c9bd",
-    "#d1c9bd",
-]
-
-colors['cow']= [
-    "#e0bb7f",
-    "#00b3b3",
-    "#ff748c",
-    "#a280ff",
-    "#ff8b61",
-    "#bd8ad4",
-    "#ffc874",
-    "#fff968",
-]
+mappings_hover = {}
 # Load mapbox token from environment variable or file
 token = os.getenv('MAPBOX_TOKEN')
 if not token:
     token = open(".mapbox_token").read()
 
-
-# Names of float columns
-float_columns = [
-    'cow', 'education', 'x', 'y', 'income', 'age', 'sex'
-]
-
-column_labels = {
-    # 'education': 'education',
-    'sex': 'sex',
-    # 'income': 'income',
-    # 'cow': 'Class of Worker',
-}
-
-cow_mappings_hover = {
+mappings_hover['cow'] = {
     0: "Private for-profit wage and salary workers: Employee of private company workers",
     1: "Private for-profit wage and salary workers: Self-employed in own incorporated business workers",
     2: "Private not-for-profit wage and salary workers",
@@ -136,16 +70,15 @@ cow_mappings_hover = {
 }
 
 mappings['cow'] = {
-    -1: "All",
-    0: "Emp private for-profit",
-    1: "Self-employed for-profit",
-    2: "Emp private not-for-profit",
+    0: "Emp",
+    1: "Self-emp",
+    2: "Emp non-profit",
     3: "Local gov emp",
     4: "State gov emp",
     5: "Federal gov emp",
-    6: "Self-emp in own not business",
-    7: "Unpaid family workers",
-    8: "Data not available/under 16 years",
+    6: "Self-emp non-business",
+    7: "Unpaid workers",
+    8: "below age 16",
 }
 
 mappings['sex'] = {
@@ -154,7 +87,7 @@ mappings['sex'] = {
     1: 'Females'
 }
 
-mappings['education']= {
+mappings_hover['education']= {
     0: "No schooling completed",
     1: "Nursery to 4th grade",
     2: "5th and 6th grade",
@@ -174,7 +107,29 @@ mappings['education']= {
     16: 'below 16 years/data not available'
 }
 
-mappings['income'] = {
+
+mappings['education'] = {
+    0: "No school",
+    1: "Upto 4th",
+    2: "5th & 6th",
+    3: "7th & 8th",
+    4: "9th",
+    5: "10th",
+    6: "11th",
+    7: "12th",
+    8: "High school",
+    9: "College(<1 yr)",
+    10: "College(no degree)",
+    11: "Associate's",
+    12: "Bachelor's",
+    13: "Master's",
+    14: "Prof. school",
+    15: "Doctorate",
+    16: 'below age 16'
+}
+
+
+mappings_hover['income'] = {
     0: "$1 to $2,499 or loss",
     1: "$2,500 to $4,999",
     2: "$5,000 to $7,499",
@@ -197,6 +152,31 @@ mappings['income'] = {
     19: "$100,000 or more",
     20: 'below 25 years/unknown',
 }
+
+mappings['income'] = {
+    0: "$2,499",
+    1: "$4,999",
+    2: "$7,499",
+    3: "$9,999",
+    4: "$12,499",
+    5: "$14,999",
+    6: "$17,499",
+    7: "$19,999",
+    8: "$22,499",
+    9: "$24,999",
+    10: "$29,999",
+    11: "$34,999",
+    12: "$39,999",
+    13: "$44,999",
+    14: "$49,999",
+    15: "$54,999",
+    16: "$64,999",
+    17: "$74,999",
+    18: "$99,999",
+    19: "$100,000+",
+    20: 'below age 25',
+}
+
 
 data_center_3857, data_3857, data_4326, data_center_4326 = [], [], [], []
 
@@ -224,7 +204,7 @@ def set_projection_bounds(df_d):
     transformer_3857_to_4326 = Transformer.from_crs("epsg:3857", "epsg:4326")
     def epsg_3857_to_4326(coords):
         return [list(reversed(transformer_3857_to_4326.transform(*row))) for row in coords]
-    
+
     data_3857 = (
         [df_d.x.min(), df_d.y.min()],
         [df_d.x.max(), df_d.y.max()]
@@ -339,29 +319,6 @@ app.layout = html.Div(children=[
                             clearable=False,
                         )),
                     ]),
-                    html.Tr([
-                        html.Td(html.Div("Class of Workers"), className="config-label"),
-                        html.Td(dcc.Dropdown(
-                            id='cow-dropdown',
-                            options=[
-                                {'label': val, 'value': key}
-                                for key, val in mappings['cow'].items()
-                            ],
-                            value=-1,
-                            searchable=False,
-                            clearable=False,
-                        )),
-                        html.Td(dcc.Dropdown(
-                            id='sex-dropdown',
-                            options=[
-                                {'label': val, 'value': key}
-                                for key, val in mappings['sex'].items()
-                            ],
-                            value=-1,
-                            searchable=False,
-                            clearable=False,
-                        )),
-                    ]),
                 ], style={'width': '100%', 'height': f'{row_heights[0]}px'}),
             ], className='six columns pretty_container', id="config-div"),
         ]),
@@ -374,6 +331,9 @@ app.layout = html.Div(children=[
                 id='map-graph',
                 figure=blank_fig(row_heights[1]),
             ),
+            # Hidden div inside the app that stores the intermediate value
+            html.Div(id='intermediate-state-value', style={'display': 'none'})
+
         ], className='twelve columns pretty_container',
             style={
                 'width': '98%',
@@ -398,7 +358,7 @@ app.layout = html.Div(children=[
                         animate=True
                     ),
                 ],
-                className='twelve columns pretty_container', id="age-div"
+                className='twelve columns pretty_container', id="education-div"
             )
         ]),
         html.Div(children=[
@@ -418,7 +378,7 @@ app.layout = html.Div(children=[
                         animate=True
                     ),
                 ],
-                className='twelve columns pretty_container', id="age-div"
+                className='twelve columns pretty_container', id="income-div"
             )
         ]),
         html.Div(children=[
@@ -438,7 +398,7 @@ app.layout = html.Div(children=[
                         animate=True
                     ),
                 ],
-                className='twelve columns pretty_container', id="age-div"
+                className='twelve columns pretty_container', id="cow-div"
             )
         ]),
         html.Div(children=[
@@ -560,7 +520,7 @@ def build_query(selections, exclude=None):
 
 
 # Plot functions
-def build_colorscale(colorscale_name, transform, agg, agg_col):
+def build_colorscale(colorscale_name, transform):
     """
     Build plotly colorscale
 
@@ -621,7 +581,7 @@ def build_datashader_plot(
     if aggregate == 'count_cat':
         datashader_color_scale['color_key'] = colors[aggregate_column] 
     else:
-        datashader_color_scale['cmap'] = [i[1] for i in build_colorscale(colorscale_name, colorscale_transform, aggregate, aggregate_column)]
+        datashader_color_scale['cmap'] = [i[1] for i in build_colorscale(colorscale_name, colorscale_transform)]
         if not isinstance(df, cudf.DataFrame):
             df[aggregate_column] = df[aggregate_column].astype('int8')
 
@@ -630,17 +590,17 @@ def build_datashader_plot(
         plot_height=1400,
         x_range=x_range, y_range=y_range
     )
-    
+
     agg = cvs.points(
         df, x='x', y='y', agg=getattr(ds, aggregate)(aggregate_column)
     )
-    
+
 
     # Count the number of selected towers
     temp = agg.sum()
     temp.data = cupy.asnumpy(temp.data)
     n_selected = int(temp)
-    
+
     if n_selected == 0:
         # Nothing to display
         lat = [None]
@@ -651,17 +611,8 @@ def build_datashader_plot(
     else:
         # Shade aggregation into an image that we can add to the map as a mapbox
         # image layer
-        max_px = 1
-        if n_selected<5000:
-            max_px=10
-        img = tf.shade(agg, **datashader_color_scale)
-        img = tf.dynspread(
-                    img,
-                    threshold=0.5,
-                    max_px=max_px,
-                    shape='circle',
-                ).to_pil()
-
+        img = tf.shade(agg, **datashader_color_scale).to_pil()
+    
         # Add image as mapbox image layer. Note that as of version 4.4, plotly will
         # automatically convert the PIL image object into a base64 encoded png string
         layers = [
@@ -720,73 +671,9 @@ def build_datashader_plot(
 
     return map_graph
 
-def scatter_bubble_2d(df, columnx, columny, selections, query_cache, colorscale_name, colorscale_transform, aggregate, aggregate_column):
-    """
-    Build histogram figure
-
-    Args:
-        df: pandas or cudf DataFrame
-        columnx: Column name for x axis
-        columny: Column name for y axis
-        selections: Dictionary from column names to query expressions
-        query_cache: Dict from query expression to filtered DataFrames
-        colorscale_name: Name of plotly colorscale
-        colorscale_transform: Colorscale transformation
-
-    Returns:
-        2d scatter plot
-    """
-    query = build_query(selections, columnx)
-    if query in query_cache:
-        df = query_cache[query]
-    elif query:
-        df = df.query(query)
-        query_cache[query] = df
-
-    if isinstance(df, cudf.DataFrame):
-        temp = df.groupby([columny,columnx])['sex'].count().to_pandas().reset_index(level=[0,1])
-    else:
-        temp = df.groupby([columny,columnx])['sex'].count().reset_index(level=[0,1])
-    x = temp[columnx].values
-    y = temp[columny].values
-    size = temp['sex'].values
-    color_temp = {'color': size}
-    colorscale = build_colorscale(colorscale_name, colorscale_transform, aggregate, aggregate_column)
-
-    if aggregate == 'count_cat' and aggregate_column == columnx:
-        color_temp['color'] = x
-        colorscale = [(v, clr) for v, clr in zip(mappings[columnx].keys(), colors[columnx])]
-    if aggregate == 'count_cat' and aggregate_column == columny:
-        color_temp['color'] = y
-        colorscale = [(v, clr) for v, clr in zip(mappings[columny].keys(), colors[columny])]
-
-    
-    fig = {
-        'data': [{
-            'type': 'scatter', 'x': x, 'y': y,
-            'mode':'markers',
-            'marker': dict(size=np.log2(size),
-                **color_temp,
-                colorscale=colorscale,colorbar=dict(
-                    title='Number of people',
-                    thickness=20
-                    )),
-            'text':size,
-            'hovertemplate': "<b> %{y}</b> </br> </br>" +
-                "%{xaxis.title.text}: %{x}<br>" +
-                "Number of people: %{text:,}"
-        },
-        ]
-    }
-
-    if columnx not in selections:
-        fig['data'][0]['selectedpoints'] = False
-
-    return fig
-
 def build_histogram_default_bins(
-    df, column, selections, query_cache, orientation,
-    colorscale_name, colorscale_transform, aggregate, aggregate_column
+    df, column, selections, query_cache,
+    orientation, colorscale_name, colorscale_transform
 ):
     """
     Build histogram figure
@@ -800,76 +687,95 @@ def build_histogram_default_bins(
     Returns:
         Histogram figure dictionary
     """
+    query = build_query(selections, column)
+    if query in query_cache:
+        df = query_cache[query]
+    elif query:
+        df = df.query(query)
+        query_cache[query] = df
+
+    df = df.groupby(column)['x'].count().to_pandas()
+
     bin_edges = df.index.values
     counts = df.values
 
-    color_scale = build_colorscale(colorscale_name, colorscale_transform, aggregate, aggregate_column)
-    marker = {'color': text_color}
-    if aggregate == 'count_cat' and column == aggregate_column:
-        colorscale = [clr for v, clr in zip(mappings[aggregate_column].keys(), colors[aggregate_column])]
+    mapping_options = {}
+    xaxis_labels = {}
+    if column in mappings:
+        if column in mappings_hover:
+            mapping_options = {
+            'text': list(mappings_hover[column].values()),
+            'hovertemplate': "%{text}: %{y} <extra></extra>"
+            }
+        else:
+            mapping_options = {
+                'text': list(mappings[column].values()),
+                'hovertemplate': "%{text} : %{y} <extra></extra>"
+            }
+        xaxis_labels = {
+            'tickvals': list(mappings[column].keys()),
+            'ticktext': list(mappings[column].values())
+        }
+    
+    # color_scale = build_colorscale(colorscale_name, colorscale_transform)
 
-    range_ages = [20, 40, 60, 84, 85]
-    colors_ages = ['#C700E5','#9D00DB', '#7300D2','#4900C8','#1F00BF']
-    labels = ['0-20', '21-40', '41-60', '60-84', '85+']
     # centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
     if orientation == 'h':
         fig = {
-            'data':[],
+            'data':[{
+            'type': 'bar', 'x': bin_edges, 'y': counts,
+            'marker': {
+                'color': counts,
+                'colorscale': colorscale_name
+            },
+            **mapping_options
+        }],
             'layout': {
                 'xaxis': {
                     'type': 'linear',
                     'title': {
                         'text': "Count"
-                    }
+                    },
+                },
+                'yaxis': {
+                    **xaxis_labels
                 },
                 'selectdirection': 'v',
                 'dragmode': 'select',
                 'template': template,
                 'uirevision': True,
+                'hovermode': 'closest'
             }
         }
     else:
         fig = {
-            'data': [],
+            'data': [{
+                'type': 'bar', 'x': bin_edges, 'y': counts,
+                'marker': {
+                    'color': counts,
+                    'colorscale': colorscale_name
+                },
+                **mapping_options
+
+            }],
             'layout': {
                 'yaxis': {
                     'type': 'linear',
                     'title': {
                         'text': "Count"
-                    }
+                    },
+                },
+                'xaxis': {
+                    **xaxis_labels
                 },
                 'selectdirection': 'h',
                 'dragmode': 'select',
                 'template': template,
                 'uirevision': True,
+                'hovermode': 'closest'
             }
         }
-
-    for index, ages in enumerate(range_ages):
-        if index == 0:
-            count_temp = counts[:ages]
-            bin_edges_temp = bin_edges[:ages]
-        else:
-            count_temp = counts[range_ages[index-1]:ages]
-            bin_edges_temp = bin_edges[range_ages[index-1]:ages]
-
-        if orientation == 'h':
-            fig['data'].append(
-                {
-                'type': 'bar', 'x': count_temp, 'y': bin_edges_temp,
-                'marker': {'color': colors_ages[index]},
-                'name':labels[index]
-                }
-            )
-        else:
-            fig['data'].append(
-                {
-                'type': 'bar', 'x': bin_edges_temp, 'y': count_temp,
-                'marker': {'color': colors_ages[index]},
-                'name':labels[index]
-                }
-            )
-        
+    
     if column not in selections:
         for i in range(len(fig['data'])):
             fig['data'][i]['selectedpoints'] = False
@@ -878,24 +784,34 @@ def build_histogram_default_bins(
 
 
 def build_updated_figures(
-        df, relayout_data, selected_map, selected_age, selected_scatter_graph,
-        aggregate, colorscale_name, selected_cow, selected_sex,
-        coordinates_4326_backup, position_backup
+        df, relayout_data, selected_map, selected_education,
+        selected_income, selected_cow, selected_age, aggregate,
+        colorscale_name, data_3857, data_center_3857, data_4326,
+        data_center_4326, coordinates_4326_backup, position_backup
 ):
     """
     Build all figures for dashboard
 
     Args:
-        df: pandas or cudf DataFrame
-        relayout_data: relayout_data for datashader figure
-        selected_age_male: selectedData for age-male histogram
-        selected_age_female: selectedData for age-female histogram
-        selected_cow: selectedData for class of worker histogram
-        selected_scatter_graph: selectedData for education-income scatter plot
-        aggregate: Aggregate operation for choropleth (count, mean, etc.)
-        aggregate_column: Aggregate column for choropleth
-        colorscale_name: Colorscale name from plotly.colors.sequential
-        colorscale_transform: Colorscale transformation ('linear', 'sqrt', 'cbrt', 'log')
+        - df: census 2010 dataset (cudf.DataFrame)
+        - df_hospitals: hospitals dataset (cudf.DataFrame)
+        - df_covid: covid dataset (cudf.DataFrame)
+        - relayout_data: plotly relayout object(dict) for datashader figure
+        - selected_map: selected_map dictionary object from plotly box-select
+        - aggregate: aggregate function (str)
+        - aggregate_column: aggregate column (census column name)
+        - population_enabled: Bool
+        - population_colorscale: colorscale name (str)
+        - hospital_enabled: Bool
+        - hospital_colorscale: colorscale name (str)
+        - covid_enabled: Bool
+        - covid_count_type: count/count_cat
+        - data_3857
+        - data_center_3857
+        - data_4326
+        - data_center_4326
+        - coordinates_4326_backup
+        - position_backup
 
     Returns:
         tuple of figures in the following order
@@ -903,60 +819,28 @@ def build_updated_figures(
         cow_histogram, scatter_graph,
         n_selected_indicator)
     """
-    global data_3857, data_center_3857, data_4326, data_center_4326
-
     colorscale_transform, aggregate_column = 'linear', 'sex'
     selected = {}
 
-    if selected_age:
-        selected = {
-            'age': bar_selection_to_query(selected_age, 'age')
-        }
+    selected = {
+        col: bar_selection_to_query(sel, col)
+        for col, sel in zip([
+            'education', 'income',
+            'cow', 'age'
+        ], [
+            selected_education, selected_income, selected_cow, selected_age
+        ]) if sel and sel.get('points', [])
+    }
 
     array_module = cupy if isinstance(df, cudf.DataFrame) else np
+    
     all_hists_query = build_query(selected)
 
-    drop_down_queries = ''
-    if selected_sex != -1:
-        drop_down_queries = 'sex == @selected_sex'
-
-    if selected_cow != -1:
-        if len(drop_down_queries) == 0:
-            drop_down_queries = 'cow == @selected_cow'
-        else:
-            drop_down_queries += ' and cow == @selected_cow'
-    
-    if len(drop_down_queries) > 0:
-        df = df.query(drop_down_queries)
-
-    isin_mask_scatter = None
-
-    if selected_scatter_graph:
-        selected_pincp = array_module.array([p['x'] for p in selected_scatter_graph['points']])
-        selected_schl = array_module.array([p['y'] for p in selected_scatter_graph['points']])
-        pincp_array = df.income.values
-        schl_array = df.education.values
-        isin_mask1 = array_module.zeros(len(pincp_array), dtype=np.bool)
-        isin_mask2 = array_module.zeros(len(schl_array), dtype=np.bool)
-        
-        stride = 32
-        for i in range(0, len(selected_pincp), stride):
-            zips_chunk = selected_pincp[i:i+stride]
-            isin_mask1 |= array_module.isin(pincp_array, zips_chunk)
-        for i in range(0, len(selected_schl), stride):
-            zips_chunk = selected_schl[i:i+stride]
-            isin_mask2 |= array_module.isin(schl_array, zips_chunk)
-
-        isin_mask_scatter = array_module.logical_and(isin_mask1, isin_mask2)
-        df = df[isin_mask_scatter]
-    else:
-        selected_pincp = None
-        selected_schl = None
-    
     # if relayout_data is not None:
     transformer_4326_to_3857 = Transformer.from_crs("epsg:4326", "epsg:3857")
     def epsg_4326_to_3857(coords):
         return [transformer_4326_to_3857.transform(*reversed(row)) for row in coords]
+    
     coordinates_4326 = relayout_data and relayout_data.get('mapbox._derived', {}).get('coordinates', None)
     dragmode = relayout_data and 'dragmode' in relayout_data and coordinates_4326_backup is not None
 
@@ -1048,44 +932,27 @@ def build_updated_figures(
     
     query_cache = {}
 
+    education_histogram = build_histogram_default_bins(
+        df, 'education', selected, query_cache,'v', colorscale_name, colorscale_transform
+    )
 
-    if isinstance(df, cudf.DataFrame):
-        df = df.groupby('age')['x'].count().to_pandas()
-    else:
-        df = df.groupby('age')['x'].count()
+    income_histogram = build_histogram_default_bins(
+        df, 'income', selected, query_cache,'v', colorscale_name, colorscale_transform
+    )
+
+    cow_histogram = build_histogram_default_bins(
+        df, 'cow', selected, query_cache,'v', colorscale_name, colorscale_transform
+    )
 
     age_histogram = build_histogram_default_bins(
-        df, 'age', selected, query_cache,'v', colorscale_name, colorscale_transform, aggregate, aggregate_column
-    )
-    
-    
-    scatter_graph = scatter_bubble_2d(
-        df_hists,'income', 'education', selected, query_cache, colorscale_name, colorscale_transform, aggregate, aggregate_column
+        df, 'age', selected, query_cache,'v', colorscale_name, colorscale_transform
     )
 
-    scatter_graph['layout'] = {
-            'xaxis': {
-                'title': {
-                    'text': "Income ($)"
-                },
-                'ticktext': list(mappings['income'].values()),
-                'tickvals': list(mappings['income'].keys())
-            },
-            'yaxis': {
-                'title': {
-                    'text': "Education Category"
-                },
-                'ticktext': list(mappings['education'].values()),
-                'tickvals': list(mappings['education'].keys())
-            },
-            'hovermode': 'closest',
-            'dragmode': 'select',
-            'template': template,
-            'uirevision': True,
-        }
 
-    return (datashader_plot, age_histogram, scatter_graph,
-        n_selected_indicator,coordinates_4326_backup, position_backup
+    return (
+        datashader_plot, education_histogram, income_histogram,
+        cow_histogram, age_histogram, n_selected_indicator,
+        coordinates_4326_backup, position_backup
     )
 
 
@@ -1096,27 +963,37 @@ def register_update_plots_callback(client):
         df_d: Dask.delayed pandas or cudf DataFrame
     """
     @app.callback(
-        [Output('indicator-graph', 'figure'), Output('map-graph', 'figure'),
-         Output('age-histogram', 'figure'), Output('scatter-graph', 'figure'),
-         Output('map-graph', 'config')
-         ],
+        [
+            Output('indicator-graph', 'figure'), Output('map-graph', 'figure'),
+            Output('education-histogram', 'figure'), Output('income-histogram', 'figure'),
+            Output('cow-histogram', 'figure'), Output('age-histogram', 'figure'),
+            Output('map-graph', 'config'), Output('intermediate-state-value', 'children')
+        ],
         [
             Input('map-graph', 'relayoutData'), Input('map-graph', 'selectedData'),
-            Input('age-histogram', 'selectedData'), Input('scatter-graph', 'selectedData'),
+            Input('education-histogram', 'selectedData'), Input('income-histogram', 'selectedData'),
+            Input('cow-histogram', 'selectedData'), Input('age-histogram', 'selectedData'), 
             Input('aggregate-dropdown', 'value'), Input('colorscale-dropdown', 'value'),
-            Input('cow-dropdown', 'value'), Input('sex-dropdown', 'value'),
             Input('gpu-toggle', 'on')
+        ],
+        [
+            State('intermediate-state-value', 'children')
         ]
     )
     def update_plots(
-            relayout_data, selected_map, selected_age, selected_scatter_graph,
-            aggregate, colorscale_name, selected_cow, selected_sex, gpu_enabled
+            relayout_data, selected_map, selected_education,
+            selected_income, selected_cow, selected_age,
+            aggregate, colorscale_name, gpu_enabled, coordinates_backup
     ):
-        global data_3857, data_center_3857, data_4326, data_center_4326, coordinates_4326_backup, position_backup
+        global data_3857, data_center_3857, data_4326, data_center_4326
 
         t0 = time.time()
 
-    
+        if coordinates_backup is not None:
+            coordinates_4326_backup, position_backup = coordinates_backup
+        else:
+            coordinates_4326_backup, position_backup = None, None
+
         # Get delayed dataset from client
         if gpu_enabled:
             df_d = client.get_dataset('c_df_d')
@@ -1128,23 +1005,27 @@ def register_update_plots_callback(client):
             data_3857, data_center_3857, data_4326, data_center_4326 = projections.compute()
 
         figures_d = delayed(build_updated_figures)(
-            df_d, relayout_data, selected_map, selected_age, selected_scatter_graph,
-            aggregate, colorscale_name, selected_cow, selected_sex,
-            coordinates_4326_backup, position_backup
+            df_d, relayout_data, selected_map, selected_education,
+            selected_income, selected_cow, selected_age, aggregate,
+            colorscale_name, data_3857, data_center_3857, data_4326,
+            data_center_4326, coordinates_4326_backup, position_backup
         )
 
         figures = figures_d.compute()
 
-        (datashader_plot, age_histogram, scatter_graph,
-        n_selected_indicator, coordinates_4326_backup, position_backup) = figures
+        (datashader_plot, education_histogram, income_histogram,
+        cow_histogram, age_histogram, n_selected_indicator,
+        coordinates_4326_backup, position_backup) = figures
 
         print(f"Update time: {time.time() - t0}")
         return (
-            n_selected_indicator, datashader_plot, age_histogram, scatter_graph,
+            n_selected_indicator, datashader_plot, education_histogram,
+            income_histogram, cow_histogram, age_histogram,
             {
                 'displayModeBar':True,
                 'modeBarButtonsToRemove': ['lasso2d', 'zoomInMapbox', 'zoomOutMapbox', 'toggleHover']
-            }
+            }, 
+            (coordinates_4326_backup, position_backup)
         )
 
 def check_dataset(dataset_url, data_path):
