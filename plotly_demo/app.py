@@ -34,7 +34,7 @@ text_color = "#cfd8dc"  # Material blue-grey 100
 mapbox_land_color = "#343332"
 
 # Figure template
-row_heights = [150, 440, 200, 540]
+row_heights = [150, 440, 250, 75]
 template = {
     'layout': {
         'paper_bgcolor': bgcolor,
@@ -50,6 +50,8 @@ template = {
 
 
 colors = {}
+colors['sex'] = ['#0000FF', '#00ff00']
+
 mappings = {}
 mappings_hover = {}
 # Load mapbox token from environment variable or file
@@ -263,15 +265,12 @@ app.layout = html.Div(children=[
                 html.H4([
                     "Population Count",
                 ], className="container_title"),
-                dcc.Loading(
                     dcc.Graph(
                         id='indicator-graph',
-                        figure=blank_fig(row_heights[0]),
+                        figure=blank_fig(row_heights[3]),
                         config={'displayModeBar': False},
-                    ),
-                    style={'height': row_heights[0]},
-                )
-            ], className='six columns pretty_container', id="indicator-div"),
+                    )
+            ],style={'height': f'{row_heights[0]}px'}, className='six columns pretty_container', id="indicator-div"),
             html.Div(children=[
                 html.Div(children=[
                     html.Button(
@@ -282,7 +281,7 @@ app.layout = html.Div(children=[
                     "Options",
                 ], className="container_title"),
                 html.Table([
-                    html.Col(style={'width': '100px'}),
+                    html.Col(style={'width': '180'}),
                     html.Col(),
                     html.Col(),
                     html.Tr([
@@ -294,33 +293,22 @@ app.layout = html.Div(children=[
                             color='#00cc96',
                             id='gpu-toggle',
                         ))),
-                    ]),
-                    html.Tr([
                         html.Td(html.Div("Color by"), className="config-label"),
                         html.Td(dcc.Dropdown(
-                            id='aggregate-dropdown',
-                            options=
-                            [
-                                {'label': 'count', 'value': 'count'},
-                                {'label': 'category by gender', 'value': 'count_cat'},
-                            ],
-                            value='count',
-                            searchable=False,
-                            clearable=False,
-                        )),
-                        html.Td(dcc.Dropdown(
                             id='colorscale-dropdown',
-                            options=[
-                                {'label': cs, 'value': cs}
-                                for cs in ['Viridis', 'Cividis', 'Magma']
+                            options = [
+                                {'label': 'Total Count by Viridis Color Scale', 'value': 'Viridis'},
+                                {'label': 'Total Count by Cividis Color Scale', 'value': 'Cividis'},
+                                {'label': 'Total Count by Magma Color Scale', 'value': 'Magma'},
+                                {'label': 'Gender Count by Blugrn Color Scale', 'value': 'Blugrn'},
                             ],
                             value='Viridis',
                             searchable=False,
                             clearable=False,
-                        )),
+                        ), style={'width': '50%', 'height':'15px'}),
                     ]),
-                ], style={'width': '100%', 'height': f'{row_heights[0]}px'}),
-            ], className='six columns pretty_container', id="config-div"),
+                ], style={'width': '100%', 'margin-top': '30px'}),
+            ], style={'height': f'{row_heights[0]}px'}, className='six columns pretty_container', id="config-div"),
         ]),
         html.Div(children=[
             html.Button("Clear Selection", id='reset-map', className='reset-button'),
@@ -329,6 +317,7 @@ app.layout = html.Div(children=[
             ], className="container_title"),
             dcc.Graph(
                 id='map-graph',
+                config={'displayModeBar': False},
                 figure=blank_fig(row_heights[1]),
             ),
             # Hidden div inside the app that stores the intermediate value
@@ -354,7 +343,7 @@ app.layout = html.Div(children=[
                     dcc.Graph(
                         id='education-histogram',
                         config={'displayModeBar': False},
-                        figure=blank_fig(row_heights[1]),
+                        figure=blank_fig(row_heights[2]),
                         animate=True
                     ),
                 ],
@@ -374,7 +363,7 @@ app.layout = html.Div(children=[
                     dcc.Graph(
                         id='income-histogram',
                         config={'displayModeBar': False},
-                        figure=blank_fig(row_heights[1]),
+                        figure=blank_fig(row_heights[2]),
                         animate=True
                     ),
                 ],
@@ -394,7 +383,7 @@ app.layout = html.Div(children=[
                     dcc.Graph(
                         id='cow-histogram',
                         config={'displayModeBar': False},
-                        figure=blank_fig(row_heights[1]),
+                        figure=blank_fig(row_heights[2]),
                         animate=True
                     ),
                 ],
@@ -414,7 +403,7 @@ app.layout = html.Div(children=[
                     dcc.Graph(
                         id='age-histogram',
                         config={'displayModeBar': False},
-                        figure=blank_fig(row_heights[1]),
+                        figure=blank_fig(row_heights[2]),
                         animate=True
                     ),
                 ],
@@ -546,11 +535,11 @@ def build_colorscale(colorscale_name, transform):
         scale_values = (10 ** np.linspace(0, 1, len(colors_temp)) - 1) / 9
     else:
         raise ValueError("Unexpected colorscale transform")
-    
     return [(v, clr) for v, clr in zip(scale_values, colors_temp)]
 
+
 def build_datashader_plot(
-        df, aggregate, aggregate_column, colorscale_name, colorscale_transform,
+        df, aggregate_column, colorscale_name, colorscale_transform,
         new_coordinates, position, x_range, y_range
 ):
     """
@@ -558,7 +547,6 @@ def build_datashader_plot(
 
     Args:
         df: pandas or cudf DataFrame
-        aggregate: Aggregate operation (count, mean, etc.)
         aggregate_column: Column to perform aggregate on. Ignored for 'count' aggregate
         colorscale_name: Name of plotly colorscale
         colorscale_transform: Colorscale transformation
@@ -578,8 +566,11 @@ def build_datashader_plot(
     query_expr_xy = f"(x >= {x0}) & (x <= {x1}) & (y >= {y0}) & (y <= {y1})"
     datashader_color_scale = {}
 
-    if aggregate == 'count_cat':
+    aggregate = 'count'
+
+    if colorscale_name == 'Blugrn':
         datashader_color_scale['color_key'] = colors[aggregate_column] 
+        aggregate = 'count_cat'
     else:
         datashader_color_scale['cmap'] = [i[1] for i in build_colorscale(colorscale_name, colorscale_transform)]
         if not isinstance(df, cudf.DataFrame):
@@ -594,7 +585,8 @@ def build_datashader_plot(
     agg = cvs.points(
         df, x='x', y='y', agg=getattr(ds, aggregate)(aggregate_column)
     )
-
+    cmin = cupy.asnumpy(agg.min().data)
+    cmax = cupy.asnumpy(agg.max().data)
 
     # Count the number of selected towers
     temp = agg.sum()
@@ -611,7 +603,7 @@ def build_datashader_plot(
     else:
         # Shade aggregation into an image that we can add to the map as a mapbox
         # image layer
-        img = tf.shade(agg, **datashader_color_scale).to_pil()
+        img = tf.shade(agg, how='log', **datashader_color_scale).to_pil()
     
         # Add image as mapbox image layer. Note that as of version 4.4, plotly will
         # automatically convert the PIL image object into a base64 encoded png string
@@ -631,16 +623,7 @@ def build_datashader_plot(
 
     # Build map figure
     map_graph = {
-        'data': [{
-            'type': 'scattermapbox',
-            'lat': lat, 'lon': lon,
-            'customdata': customdata,
-            'marker': marker,
-            'hovertemplate': (
-                "sex: %{customdata[0]}<br>"
-                "<extra></extra>"
-            )
-        }],
+        'data': [],
         'layout': {
             'template': template,
             'uirevision': True,
@@ -649,7 +632,7 @@ def build_datashader_plot(
                 'accesstoken': token,
                 'layers': layers,
             },
-            'margin': {"r": 0, "t": 0, "l": 0, "b": 0},
+            'margin': {"r": 140, "t": 0, "l": 0, "b": 0},
             'height': 500,
             'shapes': [{
                 'type': 'rect',
@@ -666,6 +649,61 @@ def build_datashader_plot(
             }]
         },
     }
+
+    if aggregate == 'count_cat':
+        # for `Age By PurBlue` category
+        colorscale = [0, 1]
+        marker = dict(
+                size=0,
+                showscale=True,
+                colorbar= {
+                    "title": {
+                        "text": 'Sex', "side": "right", "font": {"size": 14}
+                    },
+                    "tickvals":[0.25,0.75],
+                    "ticktext": ['male', 'female'],
+                    "ypad":30
+                },
+                colorscale=[(0.00, colors['sex'][0]), (0.50, colors['sex'][0]),
+                            (0.50, colors['sex'][1]),  (1.00, colors['sex'][1])],
+                cmin=0,
+                cmax=1,
+            )
+
+        map_graph['data'].append(
+            {
+                'type': 'scattermapbox',
+                'lat': lat, 'lon': lon,
+                'customdata': customdata,
+                'marker': marker,
+                'hoverinfo': 'none',
+            }
+        )
+        map_graph['layout']['annotations'] = []
+    else:
+        marker = dict(
+                size=0,
+                showscale=True,
+                colorbar= {"title": {
+                    "text": 'Population', "side": "right", "font": {"size": 14}
+                },
+                "ypad":30},
+                colorscale=build_colorscale(
+                    colorscale_name, colorscale_transform,
+                ),
+                cmin=cmin,
+                cmax=cmax
+            )
+        map_graph['data'].append(
+            {
+                'type': 'scattermapbox',
+                'lat': lat, 'lon': lon,
+                'customdata': customdata,
+                'marker': marker,
+                'hoverinfo': 'none'
+            }
+        )
+
 
     map_graph['layout']['mapbox'].update(position)
 
@@ -726,7 +764,7 @@ def build_histogram_default_bins(
             'type': 'bar', 'x': bin_edges, 'y': counts,
             'marker': {
                 'color': counts,
-                'colorscale': colorscale_name
+                'colorscale': build_colorscale(colorscale_name, 'linear')
             },
             **mapping_options
         }],
@@ -753,7 +791,7 @@ def build_histogram_default_bins(
                 'type': 'bar', 'x': bin_edges, 'y': counts,
                 'marker': {
                     'color': counts,
-                    'colorscale': colorscale_name
+                    'colorscale': build_colorscale(colorscale_name, 'linear')                
                 },
                 **mapping_options
 
@@ -785,7 +823,7 @@ def build_histogram_default_bins(
 
 def build_updated_figures(
         df, relayout_data, selected_map, selected_education,
-        selected_income, selected_cow, selected_age, aggregate,
+        selected_income, selected_cow, selected_age,
         colorscale_name, data_3857, data_center_3857, data_4326,
         data_center_4326, coordinates_4326_backup, position_backup
 ):
@@ -794,18 +832,8 @@ def build_updated_figures(
 
     Args:
         - df: census 2010 dataset (cudf.DataFrame)
-        - df_hospitals: hospitals dataset (cudf.DataFrame)
-        - df_covid: covid dataset (cudf.DataFrame)
         - relayout_data: plotly relayout object(dict) for datashader figure
         - selected_map: selected_map dictionary object from plotly box-select
-        - aggregate: aggregate function (str)
-        - aggregate_column: aggregate column (census column name)
-        - population_enabled: Bool
-        - population_colorscale: colorscale name (str)
-        - hospital_enabled: Bool
-        - hospital_colorscale: colorscale name (str)
-        - covid_enabled: Bool
-        - covid_count_type: count/count_cat
         - data_3857
         - data_center_3857
         - data_4326
@@ -815,9 +843,9 @@ def build_updated_figures(
 
     Returns:
         tuple of figures in the following order
-        (relayout_data, age_male_histogram, age_female_histogram,
-        cow_histogram, scatter_graph,
-        n_selected_indicator)
+        (datashader_plot, education_histogram, income_histogram,
+        cow_histogram, age_histogram, n_selected_indicator,
+        coordinates_4326_backup, position_backup)
     """
     colorscale_transform, aggregate_column = 'linear', 'sex'
     selected = {}
@@ -904,7 +932,7 @@ def build_updated_figures(
         df = query_df(df, x0, x1, y0, y1, 'x', 'y')
 
     datashader_plot = build_datashader_plot(
-        df.query(all_hists_query) if all_hists_query else df, aggregate,
+        df.query(all_hists_query) if all_hists_query else df,
         aggregate_column, colorscale_name, colorscale_transform, new_coordinates, position, x_range, y_range)
 
     df_hists = df.query(all_hists_query) if all_hists_query else df
@@ -918,14 +946,15 @@ def build_updated_figures(
             ),
             'number': {
                 'font': {
-                    'color': text_color
+                    'color': text_color,
+                    'size': '40px'
                 },
                 "valueformat": ","
             }
         }],
         'layout': {
             'template': template,
-            'height': row_heights[0],
+            'height': row_heights[3],
             'margin': {'l': 10, 'r': 10, 't': 10, 'b': 10}
         }
     }
@@ -973,8 +1002,7 @@ def register_update_plots_callback(client):
             Input('map-graph', 'relayoutData'), Input('map-graph', 'selectedData'),
             Input('education-histogram', 'selectedData'), Input('income-histogram', 'selectedData'),
             Input('cow-histogram', 'selectedData'), Input('age-histogram', 'selectedData'), 
-            Input('aggregate-dropdown', 'value'), Input('colorscale-dropdown', 'value'),
-            Input('gpu-toggle', 'on')
+            Input('colorscale-dropdown', 'value'), Input('gpu-toggle', 'on')
         ],
         [
             State('intermediate-state-value', 'children')
@@ -983,7 +1011,7 @@ def register_update_plots_callback(client):
     def update_plots(
             relayout_data, selected_map, selected_education,
             selected_income, selected_cow, selected_age,
-            aggregate, colorscale_name, gpu_enabled, coordinates_backup
+            colorscale_name, gpu_enabled, coordinates_backup
     ):
         global data_3857, data_center_3857, data_4326, data_center_4326
 
@@ -1006,7 +1034,7 @@ def register_update_plots_callback(client):
 
         figures_d = delayed(build_updated_figures)(
             df_d, relayout_data, selected_map, selected_education,
-            selected_income, selected_cow, selected_age, aggregate,
+            selected_income, selected_cow, selected_age,
             colorscale_name, data_3857, data_center_3857, data_4326,
             data_center_4326, coordinates_4326_backup, position_backup
         )
