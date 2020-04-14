@@ -56,8 +56,13 @@ mappings = {}
 mappings_hover = {}
 # Load mapbox token from environment variable or file
 token = os.getenv('MAPBOX_TOKEN')
+mapbox_style = "dark"
 if not token:
-    token = open(".mapbox_token").read()
+    try:
+        token = open(".mapbox_token").read()
+    except Exception as e:
+        print('mapbox token not found, using open-street-maps')
+        mapbox_style = "carto-darkmatter"
 
 mappings_hover['cow'] = {
     0: "Private for-profit wage and salary workers: Employee of private company workers",
@@ -628,7 +633,7 @@ def build_datashader_plot(
             'template': template,
             'uirevision': True,
             'mapbox': {
-                'style': "dark",
+                'style': mapbox_style,
                 'accesstoken': token,
                 'layers': layers,
             },
