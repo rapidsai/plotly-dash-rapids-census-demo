@@ -59,8 +59,13 @@ colors = {
 
 # Load mapbox token from environment variable or file
 token = os.getenv('MAPBOX_TOKEN')
+mapbox_style = "dark"
 if not token:
-    token = open(".mapbox_token").read()
+    try:
+        token = open(".mapbox_token").read()
+    except Exception as e:
+        print('mapbox token not found, using open-street-maps')
+        mapbox_style = "carto-darkmatter"
 
 # global variables to save state
 cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4 = None, None, None, None
@@ -518,7 +523,7 @@ def build_datashader_plot(
                 'template': template,
                 'uirevision': True,
                 'mapbox': {
-                    'style': "dark",
+                    'style': mapbox_style,
                     'accesstoken': token,
                 },
                 'margin': {"r": 140, "t": 0, "l": 0, "b": 0},
