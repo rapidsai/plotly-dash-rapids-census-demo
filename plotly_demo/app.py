@@ -8,10 +8,12 @@ import requests
 import numpy as np
 import datashader as ds
 import datashader.transfer_functions as tf
+from textwrap import dedent
 
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
 import dash_daq as daq
 from plotly.colors import sequential
@@ -246,7 +248,7 @@ def blank_fig(height):
     }
 
 
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 app.layout = html.Div(children=[
     html.Div([
         html.H1(children=[
@@ -293,11 +295,26 @@ app.layout = html.Div(children=[
                         html.Td(
                             html.Div("GPU"), className="config-label"
                         ),
-                        html.Td(daq.DarkThemeProvider(daq.BooleanSwitch(
-                            on=True,
-                            color='#00cc96',
-                            id='gpu-toggle',
-                        ))),
+                        html.Td(
+                            html.Div([
+                                daq.DarkThemeProvider(daq.BooleanSwitch(
+                                    on=True,
+                                    color='#00cc96',
+                                    id='gpu-toggle',
+                                )),
+                                dbc.Tooltip(
+                                    "Caution: Using CPU compute for more than 50 million points is not recommended.",
+                                target='gpu-toggle', placement='bottom', hide_arrow=True, style={
+                                        "textAlign": "left",
+                                        "font-size": '15px',
+                                        "color": "white",
+                                        "width": '350px',
+                                        "padding": '15px',
+                                        "border-radius": '5px',
+                                        "background-color": "#2a2a2e"
+                                })
+                            ])
+                        ),
                         html.Td(html.Div("Color by"), className="config-label"),
                         html.Td(dcc.Dropdown(
                             id='colorscale-dropdown',
@@ -313,6 +330,8 @@ app.layout = html.Div(children=[
                         ), style={'width': '50%', 'height':'15px'}),
                     ]),
                 ], style={'width': '100%', 'margin-top': '30px'}),
+                # Hidden div inside the app that stores the intermediate value
+                html.Div(id='datapoints-state-value', style={'display': 'none'})
             ], style={'height': f'{row_heights[0]}px'}, className='six columns pretty_container', id="config-div"),
         ]),
         html.Div(children=[
@@ -436,6 +455,7 @@ app.layout = html.Div(children=[
         className='twelve columns pretty_container',
     ),
 ])
+
 
 # Clear/reset button callbacks
 @app.callback(
@@ -737,7 +757,10 @@ def build_histogram_default_bins(
         df = df.query(query)
         query_cache[query] = df
 
-    df = df.groupby(column)['x'].count().to_pandas()
+    if isinstance(df, cudf.DataFrame):
+        df = df.groupby(column)['x'].count().to_pandas()
+    else:
+        df = df.groupby(column)['x'].count()
 
     bin_edges = df.index.values
     counts = df.values
@@ -996,12 +1019,13 @@ def register_update_plots_callback(client):
     Args:
         df_d: Dask.delayed pandas or cudf DataFrame
     """
+
     @app.callback(
         [
             Output('indicator-graph', 'figure'), Output('map-graph', 'figure'),
             Output('education-histogram', 'figure'), Output('income-histogram', 'figure'),
             Output('cow-histogram', 'figure'), Output('age-histogram', 'figure'),
-            Output('map-graph', 'config'), Output('intermediate-state-value', 'children')
+            Output('map-graph', 'config'), Output('intermediate-state-value', 'children'),
         ],
         [
             Input('map-graph', 'relayoutData'), Input('map-graph', 'selectedData'),
