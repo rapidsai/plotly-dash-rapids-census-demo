@@ -371,7 +371,7 @@ app.layout = html.Div(children=[
                         animate=True
                     ),
                 ],
-                className='twelve columns pretty_container', id="education-div"
+                style={'margin-right': '2%'},className='six columns pretty_container', id="education-div"
             )
         ]),
         html.Div(children=[
@@ -391,7 +391,7 @@ app.layout = html.Div(children=[
                         animate=True
                     ),
                 ],
-                className='twelve columns pretty_container', id="income-div"
+                className='six columns pretty_container', id="income-div"
             )
         ]),
         html.Div(children=[
@@ -411,7 +411,7 @@ app.layout = html.Div(children=[
                         animate=True
                     ),
                 ],
-                className='twelve columns pretty_container', id="cow-div"
+                style={'margin-right': '2%'},className='six columns pretty_container', id="cow-div"
             )
         ]),
         html.Div(children=[
@@ -431,7 +431,7 @@ app.layout = html.Div(children=[
                         animate=True
                     ),
                 ],
-                className='twelve columns pretty_container', id="age-div"
+                className='six columns pretty_container', id="age-div"
             )
         ]),        
     ]),
@@ -629,7 +629,7 @@ def build_datashader_plot(
         # Shade aggregation into an image that we can add to the map as a mapbox
         # image layer
         img = tf.shade(agg, how='log', **datashader_color_scale).to_pil()
-    
+
         # Add image as mapbox image layer. Note that as of version 4.4, plotly will
         # automatically convert the PIL image object into a base64 encoded png string
         layers = [
@@ -799,6 +799,7 @@ def build_histogram_default_bins(
             'layout': {
                 'xaxis': {
                     'type': 'linear',
+                    'range': [0, counts.max()],
                     'title': {
                         'text': "Count"
                     },
@@ -819,7 +820,7 @@ def build_histogram_default_bins(
                 'type': 'bar', 'x': bin_edges, 'y': counts,
                 'marker': {
                     'color': counts,
-                    'colorscale': build_colorscale(colorscale_name, 'linear')                
+                    'colorscale': build_colorscale(colorscale_name, 'linear')         
                 },
                 **mapping_options
 
@@ -1025,7 +1026,9 @@ def register_update_plots_callback(client):
             Output('indicator-graph', 'figure'), Output('map-graph', 'figure'),
             Output('education-histogram', 'figure'), Output('income-histogram', 'figure'),
             Output('cow-histogram', 'figure'), Output('age-histogram', 'figure'),
-            Output('map-graph', 'config'), Output('intermediate-state-value', 'children'),
+            Output('map-graph', 'config'), Output('education-histogram', 'config'),
+            Output('income-histogram', 'config'), Output('cow-histogram', 'config'),
+            Output('age-histogram', 'config'), Output('intermediate-state-value', 'children'),
         ],
         [
             Input('map-graph', 'relayoutData'), Input('map-graph', 'selectedData'),
@@ -1074,14 +1077,24 @@ def register_update_plots_callback(client):
         cow_histogram, age_histogram, n_selected_indicator,
         coordinates_4326_backup, position_backup) = figures
 
+        barchart_config = {
+                'displayModeBar':True,
+                
+                'modeBarButtonsToRemove': [
+                    'zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d',
+                    'resetScale2d', 'hoverClosestCartesian', 'hoverCompareCartesian', 'toggleSpikelines'
+                ]
+            }
+
         print(f"Update time: {time.time() - t0}")
         return (
             n_selected_indicator, datashader_plot, education_histogram,
             income_histogram, cow_histogram, age_histogram,
             {
                 'displayModeBar':True,
-                'modeBarButtonsToRemove': ['lasso2d', 'zoomInMapbox', 'zoomOutMapbox', 'toggleHover']
-            }, 
+                'modeBarButtonsToRemove': ['lasso2d', 'zoomInMapbox', 'zoomOutMapbox', 'toggleHover']            
+            },
+            barchart_config, barchart_config, barchart_config, barchart_config, 
             (coordinates_4326_backup, position_backup)
         )
 
@@ -1118,7 +1131,7 @@ def publish_dataset_to_cluster():
     check_dataset(census_data_url, data_path)
 
     # Note: The creation of a Dask LocalCluster must happen inside the `__main__` block,
-    cluster = LocalCUDACluster(CUDA_VISIBLE_DEVICES="0")
+    cluster = LocalCUDACluster(CUDA_VISIBLE_DEVICES="1")
     client = Client(cluster)
     print(f"Dask status: {cluster.dashboard_link}")
 
