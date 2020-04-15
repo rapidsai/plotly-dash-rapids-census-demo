@@ -39,6 +39,11 @@ mapbox_land_color = "#343332"
 covid_last_update_time = time.time()
 covid_last_update_date = datetime.datetime.today().strftime("%b-%d-%Y at %H:%M")
 
+
+command = os.popen('git log | grep Date -m 1')
+last_update = command.read()
+last_update = last_update.split('Date:')[1].split('-')[0]
+
 # Figure template
 row_heights = [200, 460, 200, 1600, 300, 100]
 template = {
@@ -435,6 +440,7 @@ app.layout = html.Div(children=[
         [
             html.H4('Acknowledgments and Data Sources', style={"margin-top": "0"}),
             dcc.Markdown(f'''
+- Dashboard last updated on {last_update}
 - 1: US Population data is from 2010 Census and 2018 ACS, sourced with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](www.nhgis.org) ( not for redistribution )
 - 2: Hospital data is from [HIFLD](https://hifld-geoplatform.opendata.arcgis.com/datasets/hospitals) ( Updated Oct-07-2019 ) and does not contain emergency field hospitals
 - 3: COVID-19 data is from the [Johns Hopkins University](https://coronavirus.jhu.edu/) data on [GitHub](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) ( Updated {covid_last_update_date} )
