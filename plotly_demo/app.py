@@ -734,8 +734,24 @@ def build_datashader_plot(
 
     return map_graph
 
+def query_df_range(df, col, x0, x1):
+    mask_ = (df[col] >= x0) & (df[col] <= x1)
+    if(mask_.sum() != len(df)):
+        df = df[mask_]
+        df.index = cudf.core.RangeIndex(0, len(df))
+    del(mask_)
+    return df
+
+def query_df_range_lat_lon(df, x0, x1, y0, y1, x, y):
+        mask_ = (df[x]>=x0) & (df[x]<=x1) & (df[y]<=y0) & (df[y]>=y1)
+        if(mask_.sum() != len(df)):
+            df = df[mask_]
+            df.index = cudf.core.RangeIndex(0,len(df))
+        del(mask_)
+        return df
+
 def build_histogram_default_bins(
-    df, column, selections, query_cache,
+    df, column, selections,
     orientation, colorscale_name, colorscale_transform
 ):
     """
@@ -745,17 +761,14 @@ def build_histogram_default_bins(
         df: pandas or cudf DataFrame
         column: Column name to build histogram from
         selections: Dictionary from column names to query expressions
-        query_cache: Dict from query expression to filtered DataFrames
 
     Returns:
         Histogram figure dictionary
     """
-    query = build_query(selections, column)
-    if query in query_cache:
-        df = query_cache[query]
-    elif query:
-        df = df.query(query)
-        query_cache[query] = df
+    for col in selections:
+        if col != column:
+            _min, _, _max = selections[col].split(' <= ')
+            df = query_df_range(df, col, int(_min), int(_max))
 
     if isinstance(df, cudf.DataFrame):
         df = df.groupby(column)['x'].count().to_pandas()
@@ -889,10 +902,6 @@ def build_updated_figures(
         ]) if sel and sel.get('points', [])
     }
 
-    array_module = cupy if isinstance(df, cudf.DataFrame) else np
-    
-    all_hists_query = build_query(selected)
-
     # if relayout_data is not None:
     transformer_4326_to_3857 = Transformer.from_crs("epsg:4326", "epsg:3857")
     def epsg_4326_to_3857(coords):
@@ -943,14 +952,6 @@ def build_updated_figures(
     x_range, y_range = zip(*coordinates_3857)
     x0, x1 = x_range
     y0, y1 = y_range
-
-    def query_df(df, x0, x1, y0, y1, x, y):
-        mask_ = (df[x]>=x0) & (df[x]<=x1) & (df[y]<=y0) & (df[y]>=y1)
-        if(mask_.sum() != len(df)):
-            df = df[mask_]
-            df.index = cudf.core.RangeIndex(0,len(df))
-        del(mask_)
-        return df
         
     if selected_map is not None:
         coordinates_4326 = selected_map['range']['mapbox']
@@ -958,14 +959,17 @@ def build_updated_figures(
         x_range_t, y_range_t = zip(*coordinates_3857)
         x0, x1 = x_range_t
         y0, y1 = y_range_t
-        df = query_df(df, x0, x1, y0, y1, 'x', 'y')
+        df = query_df_range_lat_lon(df, x0, x1, y0, y1, 'x', 'y')
 
+    df_hists = df
+    for col in selected:
+        _min, _, _max = selected[col].split(' <= ')
+        df_hists = query_df_range(df_hists, col, int(_min), int(_max))
+    
     datashader_plot = build_datashader_plot(
-        df.query(all_hists_query) if all_hists_query else df,
-        aggregate_column, colorscale_name, colorscale_transform, new_coordinates, position, x_range, y_range)
+        df_hists, aggregate_column, colorscale_name, colorscale_transform, new_coordinates, position, x_range, y_range)
 
-    df_hists = df.query(all_hists_query) if all_hists_query else df
-
+    
     # Build indicator figure
     n_selected_indicator = {
         'data': [{
@@ -988,22 +992,20 @@ def build_updated_figures(
         }
     }
     
-    query_cache = {}
-
     education_histogram = build_histogram_default_bins(
-        df, 'education', selected, query_cache,'v', colorscale_name, colorscale_transform
+        df, 'education', selected, 'v', colorscale_name, colorscale_transform
     )
 
     income_histogram = build_histogram_default_bins(
-        df, 'income', selected, query_cache,'v', colorscale_name, colorscale_transform
+        df, 'income', selected, 'v', colorscale_name, colorscale_transform
     )
 
     cow_histogram = build_histogram_default_bins(
-        df, 'cow', selected, query_cache,'v', colorscale_name, colorscale_transform
+        df, 'cow', selected, 'v', colorscale_name, colorscale_transform
     )
 
     age_histogram = build_histogram_default_bins(
-        df, 'age', selected, query_cache,'v', colorscale_name, colorscale_transform
+        df, 'age', selected, 'v', colorscale_name, colorscale_transform
     )
 
 
@@ -1131,7 +1133,7 @@ def publish_dataset_to_cluster():
     check_dataset(census_data_url, data_path)
 
     # Note: The creation of a Dask LocalCluster must happen inside the `__main__` block,
-    cluster = LocalCUDACluster(CUDA_VISIBLE_DEVICES="1")
+    cluster = LocalCUDACluster(CUDA_VISIBLE_DEVICES="0")
     client = Client(cluster)
     print(f"Dask status: {cluster.dashboard_link}")
 
