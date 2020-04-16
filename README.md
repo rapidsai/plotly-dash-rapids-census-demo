@@ -2,6 +2,9 @@
 
 ![screenshot](./RAPIDS-plotly%20Census-CV19%20v2.png)
 
+# Overview
+
+The goal of this dashboard is to help COVID-19 decision makers. Still in active development, we are soliciting feedback from the community to help improve it.
 
 # Installation and Run Steps
 
@@ -122,4 +125,4 @@ docker run --gpus all -d -p 8050:8050 plotly_demo
 - Geospatial point rendering developed with [Datashader](https://datashader.org/)
 - GPU accelerated with [RAPIDS](https://rapids.ai/) [cudf](https://github.com/rapidsai/cudf) and [cupy](https://cupy.chainer.org/) libraries
 - For more information reach out with this [Covid-19 Slack Channel](https://join.slack.com/t/rapids-goai/shared_invite/zt-2qmkjvzl-K3rVHb1rZYuFeczoR9e4EA)
-- For source code visit our [GitHub](https://github.com/rapidsai/plotly-dash-rapids-census-demo)
+- For source code, bug notes, feature requests, or to contribute, visit our [GitHub page](https://github.com/rapidsai/plotly-dash-rapids-census-demo)
