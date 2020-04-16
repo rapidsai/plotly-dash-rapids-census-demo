@@ -470,7 +470,7 @@ app.layout = html.Div(children=[
             html.H4('Acknowledgments and Data Sources',
                     style={"margin-top": "0"}),
             dcc.Markdown(f'''
-- The goal of this dashboard is to help COVID-19 decision makers. Still in active development, we are soliciting feedback from the community to help improve it. Dashboard last updated on {last_update}
+- The goal of this dashboard is to help COVID-19 decision makers. Still in active development, we are soliciting feedback from the community to help improve it.
 - 1: US Population data is from 2010 Census and 2018 ACS, sourced with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](www.nhgis.org) ( not for redistribution )
 - 2: Hospital data is from [HIFLD](https://hifld-geoplatform.opendata.arcgis.com/datasets/hospitals) ( Updated Oct-07-2019 ) and does not contain emergency field hospitals
 - 3: COVID-19 data is from the [Johns Hopkins University](https://coronavirus.jhu.edu/) data on [GitHub](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) ( Updated {covid_last_update_date} )
@@ -481,6 +481,7 @@ app.layout = html.Div(children=[
 - Cloud hosting provided by [Google](https://cloud.google.com/)
 - For more information, reach out on this [Covid-19 Slack Channel](https://join.slack.com/t/rapids-goai/shared_invite/zt-2qmkjvzl-K3rVHb1rZYuFeczoR9e4EA)
 - For source code, bug notes, feature requests, or to contribute, visit our [GitHub page](https://github.com/rapidsai/plotly-dash-rapids-census-demo)
+- Dashboard last updated on: {last_update} 
 '''),
         ],
         style={
@@ -784,8 +785,9 @@ def build_datashader_plot(
             size_markers[size_markers > 35] = 35
             annotations = {
                 'text': size_markers_labels,
+                'customdata': df_covid.acs2018_population.to_array()
             }
-            factor = 'Population Data from 2018 ACS <br> Cases Per 1000 People: <b> %{text} </b> <br>'
+            factor = 'Population Data from 2018 ACS <br> Population: %{customdata} <br> Cases Per 1000 People: <b> %{text} </b> <br>'
             sizeref = 0.3
 
         marker_border = 2*sizeref
