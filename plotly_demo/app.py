@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
 import time
 import os
-import json
 import tarfile
-import shutil
 import requests
 import numpy as np
 import datashader as ds
 import datashader.transfer_functions as tf
-from textwrap import dedent
 
 import dash
 import dash_core_components as dcc
@@ -22,7 +19,6 @@ from pyproj import Transformer
 from dask import delayed
 from distributed import Client
 from dask_cuda import LocalCUDACluster
-import plotly.graph_objects as go
 
 import cudf
 import cupy
@@ -46,13 +42,12 @@ template = {
         'bargap': 0.05,
         'xaxis': {'showgrid': False, 'automargin': True},
         'yaxis': {'showgrid': True, 'automargin': True},
-                #   'gridwidth': 0.5, 'gridcolor': mapbox_land_color},
+        #   'gridwidth': 0.5, 'gridcolor': mapbox_land_color},
     }
 }
 
-
 colors = {}
-colors['sex'] = ['#0000FF', '#00ff00']
+colors['sex'] = ['#0d47a1', '#80e878']
 
 mappings = {}
 mappings_hover = {}
@@ -96,7 +91,7 @@ mappings['sex'] = {
     1: 'Females'
 }
 
-mappings_hover['education']= {
+mappings_hover['education'] = {
     0: "No schooling completed",
     1: "Nursery to 4th grade",
     2: "5th and 6th grade",
@@ -207,10 +202,12 @@ def load_dataset(path):
 
 def set_projection_bounds(df_d):
     transformer_4326_to_3857 = Transformer.from_crs("epsg:4326", "epsg:3857")
+
     def epsg_4326_to_3857(coords):
         return [transformer_4326_to_3857.transform(*reversed(row)) for row in coords]
 
     transformer_3857_to_4326 = Transformer.from_crs("epsg:3857", "epsg:4326")
+
     def epsg_3857_to_4326(coords):
         return [list(reversed(transformer_3857_to_4326.transform(*row))) for row in coords]
 
@@ -229,6 +226,8 @@ def set_projection_bounds(df_d):
     return data_3857, data_center_3857, data_4326, data_center_4326
 
 # Build Dash app and initial layout
+
+
 def blank_fig(height):
     """
     Build blank figure with the requested height
@@ -256,14 +255,15 @@ app.layout = html.Div(children=[
             html.A(
                 html.Img(
                     src="assets/rapids-logo.png",
-                    style={'float': 'right', 'height': '50px', 'margin-right': '2%'}
+                    style={'float': 'right', 'height': '45px',
+                           'margin-right': '1%', 'margin-top': '-7px'}
                 ), href="https://rapids.ai/"),
             html.A(
                 html.Img(
                     src="assets/dash-logo.png",
-                    style={'float': 'right', 'height': '50px', 'margin-right': '2%'}
+                    style={'float': 'right', 'height': '30px'}
                 ), href="https://dash.plot.ly/"),
-  
+
         ], style={'text-align': 'left'}),
     ]),
     html.Div(children=[
@@ -272,12 +272,12 @@ app.layout = html.Div(children=[
                 html.H4([
                     "Population Count",
                 ], className="container_title"),
-                    dcc.Graph(
-                        id='indicator-graph',
-                        figure=blank_fig(row_heights[3]),
-                        config={'displayModeBar': False},
-                    )
-            ],style={'height': f'{row_heights[0]}px'}, className='six columns pretty_container', id="indicator-div"),
+                dcc.Graph(
+                    id='indicator-graph',
+                    figure=blank_fig(row_heights[3]),
+                    config={'displayModeBar': False},
+                )
+            ], style={'height': f'{row_heights[0]}px'}, className='six columns pretty_container', id="indicator-div"),
             html.Div(children=[
                 html.Div(children=[
                     html.Button(
@@ -293,7 +293,7 @@ app.layout = html.Div(children=[
                     html.Col(),
                     html.Tr([
                         html.Td(
-                            html.Div("GPU"), className="config-label"
+                            html.Div("GPU Acceleration"), className="config-label"
                         ),
                         html.Td(
                             html.Div([
@@ -304,7 +304,7 @@ app.layout = html.Div(children=[
                                 )),
                                 dbc.Tooltip(
                                     "Caution: Using CPU compute for more than 50 million points is not recommended.",
-                                target='gpu-toggle', placement='bottom', hide_arrow=True, style={
+                                    target='gpu-toggle', placement='bottom', hide_arrow=True, style={
                                         "textAlign": "left",
                                         "font-size": '15px',
                                         "color": "white",
@@ -312,30 +312,37 @@ app.layout = html.Div(children=[
                                         "padding": '15px',
                                         "border-radius": '5px',
                                         "background-color": "#2a2a2e"
-                                })
+                                    })
                             ])
                         ),
-                        html.Td(html.Div("Color by"), className="config-label"),
+                        html.Td(html.Div("Color by"),
+                                className="config-label"),
                         html.Td(dcc.Dropdown(
                             id='colorscale-dropdown',
-                            options = [
-                                {'label': 'Total Count by Viridis Color Scale', 'value': 'Viridis'},
-                                {'label': 'Total Count by Cividis Color Scale', 'value': 'Cividis'},
-                                {'label': 'Total Count by Magma Color Scale', 'value': 'Magma'},
-                                {'label': 'Gender Count by Blugrn Color Scale', 'value': 'Blugrn'},
+                            options=[
+                                {'label': 'Total Count by Viridis Color Scale',
+                                    'value': 'Viridis'},
+                                {'label': 'Total Count by Cividis Color Scale',
+                                    'value': 'Cividis'},
+                                {'label': 'Total Count by Magma Color Scale',
+                                    'value': 'Magma'},
+                                {'label': 'Gender Count by Blugrn Color Scale',
+                                    'value': 'Blugrn'},
                             ],
                             value='Viridis',
                             searchable=False,
                             clearable=False,
-                        ), style={'width': '50%', 'height':'15px'}),
+                        ), style={'width': '50%', 'height': '15px'}),
                     ]),
                 ], style={'width': '100%', 'margin-top': '30px'}),
                 # Hidden div inside the app that stores the intermediate value
-                html.Div(id='datapoints-state-value', style={'display': 'none'})
+                html.Div(id='datapoints-state-value',
+                         style={'display': 'none'})
             ], style={'height': f'{row_heights[0]}px'}, className='six columns pretty_container', id="config-div"),
         ]),
         html.Div(children=[
-            html.Button("Clear Selection", id='reset-map', className='reset-button'),
+            html.Button("Clear Selection", id='reset-map',
+                        className='reset-button'),
             html.H4([
                 "Population Distribution of Individuals",
             ], className="container_title"),
@@ -351,7 +358,7 @@ app.layout = html.Div(children=[
             style={
                 'width': '98%',
                 'margin-right': '0',
-            },
+        },
             id="map-div"
         ),
         html.Div(children=[
@@ -371,7 +378,7 @@ app.layout = html.Div(children=[
                         animate=True
                     ),
                 ],
-                style={'margin-right': '2%'},className='six columns pretty_container', id="education-div"
+                style={'margin-right': '2%'}, className='six columns pretty_container', id="education-div"
             )
         ]),
         html.Div(children=[
@@ -411,7 +418,7 @@ app.layout = html.Div(children=[
                         animate=True
                     ),
                 ],
-                style={'margin-right': '2%'},className='six columns pretty_container', id="cow-div"
+                style={'margin-right': '2%'}, className='six columns pretty_container', id="cow-div"
             )
         ]),
         html.Div(children=[
@@ -433,11 +440,12 @@ app.layout = html.Div(children=[
                 ],
                 className='six columns pretty_container', id="age-div"
             )
-        ]),        
+        ]),
     ]),
     html.Div(
         [
-            html.H4('Acknowledgements and Data Sources', style={"margin-top": "0"}),
+            html.H4('Acknowledgements and Data Sources',
+                    style={"margin-top": "0"}),
             dcc.Markdown('''\
 - 2010 Population Census and 2018 ACS data used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](https://www.nhgis.org/) ( not for redistribution )
 - Base map layer provided by mapbox
@@ -465,12 +473,14 @@ app.layout = html.Div(children=[
 def clear_map(*args):
     return None
 
+
 @app.callback(
     Output('age-histogram', 'selectedData'),
     [Input('clear-age', 'n_clicks'), Input('clear-all', 'n_clicks')]
 )
 def clear_age_hist_selections(*args):
     return None
+
 
 @app.callback(
     Output('education-histogram', 'selectedData'),
@@ -479,12 +489,14 @@ def clear_age_hist_selections(*args):
 def clear_education_hist_selections(*args):
     return None
 
+
 @app.callback(
     Output('income-histogram', 'selectedData'),
     [Input('clear-income', 'n_clicks'), Input('clear-all', 'n_clicks')]
 )
 def clear_income_hist_selections(*args):
     return None
+
 
 @app.callback(
     Output('cow-histogram', 'selectedData'),
@@ -494,6 +506,8 @@ def clear_cow_hist_selections(*args):
     return None
 
 # Query string helpers
+
+
 def bar_selection_to_query(selection, column):
     """
     Compute pandas query expression string for selection callback data
@@ -508,8 +522,8 @@ def bar_selection_to_query(selection, column):
         are contained in the selection.
     """
     point_inds = [p['label'] for p in selection['points']]
-    xmin = min(point_inds) #bin_edges[min(point_inds)]
-    xmax = max(point_inds) + 1 #bin_edges[max(point_inds) + 1]
+    xmin = min(point_inds)  # bin_edges[min(point_inds)]
+    xmax = max(point_inds) + 1  # bin_edges[max(point_inds) + 1]
     xmin_op = "<="
     xmax_op = "<="
     return f"{xmin} {xmin_op} {column} and {column} {xmax_op} {xmax}"
@@ -526,7 +540,8 @@ def build_query(selections, exclude=None):
     Returns:
         String containing a query expression compatible with DataFrame.query.
     """
-    other_selected = {sel for c, sel in selections.items() if (c != exclude and sel != -1)}
+    other_selected = {sel for c, sel in selections.items() if (
+        c != exclude and sel != -1)}
     if other_selected:
         return ' and '.join(other_selected)
     else:
@@ -547,7 +562,6 @@ def build_colorscale(colorscale_name, transform):
         Plotly color scale list
     """
     global colors, mappings
-
 
     colors_temp = getattr(sequential, colorscale_name)
     if transform == "linear":
@@ -594,10 +608,11 @@ def build_datashader_plot(
     aggregate = 'count'
 
     if colorscale_name == 'Blugrn':
-        datashader_color_scale['color_key'] = colors[aggregate_column] 
+        datashader_color_scale['color_key'] = colors[aggregate_column]
         aggregate = 'count_cat'
     else:
-        datashader_color_scale['cmap'] = [i[1] for i in build_colorscale(colorscale_name, colorscale_transform)]
+        datashader_color_scale['cmap'] = [
+            i[1] for i in build_colorscale(colorscale_name, colorscale_transform)]
         if not isinstance(df, cudf.DataFrame):
             df[aggregate_column] = df[aggregate_column].astype('int8')
 
@@ -679,21 +694,21 @@ def build_datashader_plot(
         # for `Age By PurBlue` category
         colorscale = [0, 1]
         marker = dict(
-                size=0,
-                showscale=True,
-                colorbar= {
-                    "title": {
-                        "text": 'Sex', "side": "right", "font": {"size": 14}
-                    },
-                    "tickvals":[0.25,0.75],
-                    "ticktext": ['male', 'female'],
-                    "ypad":30
+            size=0,
+            showscale=True,
+            colorbar={
+                "title": {
+                    "text": 'Sex', "side": "right", "font": {"size": 14}
                 },
-                colorscale=[(0.00, colors['sex'][0]), (0.50, colors['sex'][0]),
-                            (0.50, colors['sex'][1]),  (1.00, colors['sex'][1])],
-                cmin=0,
-                cmax=1,
-            )
+                "tickvals": [0.25, 0.75],
+                "ticktext": ['male', 'female'],
+                "ypad": 30
+            },
+            colorscale=[(0.00, colors['sex'][0]), (0.50, colors['sex'][0]),
+                        (0.50, colors['sex'][1]),  (1.00, colors['sex'][1])],
+            cmin=0,
+            cmax=1,
+        )
 
         map_graph['data'].append(
             {
@@ -707,18 +722,18 @@ def build_datashader_plot(
         map_graph['layout']['annotations'] = []
     else:
         marker = dict(
-                size=0,
-                showscale=True,
-                colorbar= {"title": {
-                    "text": 'Population', "side": "right", "font": {"size": 14}
-                },
-                "ypad":30},
-                colorscale=build_colorscale(
-                    colorscale_name, colorscale_transform,
-                ),
-                cmin=cmin,
-                cmax=cmax
-            )
+            size=0,
+            showscale=True,
+            colorbar={"title": {
+                "text": 'Population', "side": "right", "font": {"size": 14}
+            },
+                "ypad": 30},
+            colorscale=build_colorscale(
+                colorscale_name, colorscale_transform,
+            ),
+            cmin=cmin,
+            cmax=cmax
+        )
         map_graph['data'].append(
             {
                 'type': 'scattermapbox',
@@ -729,10 +744,10 @@ def build_datashader_plot(
             }
         )
 
-
     map_graph['layout']['mapbox'].update(position)
 
     return map_graph
+
 
 def query_df_range(df, col, x0, x1):
     mask_ = (df[col] >= x0) & (df[col] <= x1)
@@ -742,13 +757,15 @@ def query_df_range(df, col, x0, x1):
     del(mask_)
     return df
 
+
 def query_df_range_lat_lon(df, x0, x1, y0, y1, x, y):
-        mask_ = (df[x]>=x0) & (df[x]<=x1) & (df[y]<=y0) & (df[y]>=y1)
-        if(mask_.sum() != len(df)):
-            df = df[mask_]
-            df.index = cudf.core.RangeIndex(0,len(df))
-        del(mask_)
-        return df
+    mask_ = (df[x] >= x0) & (df[x] <= x1) & (df[y] <= y0) & (df[y] >= y1)
+    if(mask_.sum() != len(df)):
+        df = df[mask_]
+        df.index = cudf.core.RangeIndex(0, len(df))
+    del(mask_)
+    return df
+
 
 def build_histogram_default_bins(
     df, column, selections,
@@ -783,8 +800,8 @@ def build_histogram_default_bins(
     if column in mappings:
         if column in mappings_hover:
             mapping_options = {
-            'text': list(mappings_hover[column].values()),
-            'hovertemplate': "%{text}: %{y} <extra></extra>"
+                'text': list(mappings_hover[column].values()),
+                'hovertemplate': "%{text}: %{y} <extra></extra>"
             }
         else:
             mapping_options = {
@@ -795,20 +812,20 @@ def build_histogram_default_bins(
             'tickvals': list(mappings[column].keys()),
             'ticktext': list(mappings[column].values())
         }
-    
+
     # color_scale = build_colorscale(colorscale_name, colorscale_transform)
 
     # centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
     if orientation == 'h':
         fig = {
-            'data':[{
-            'type': 'bar', 'x': bin_edges, 'y': counts,
-            'marker': {
-                'color': counts,
-                'colorscale': build_colorscale(colorscale_name, 'linear')
-            },
-            **mapping_options
-        }],
+            'data': [{
+                'type': 'bar', 'x': bin_edges, 'y': counts,
+                'marker': {
+                    'color': counts,
+                    'colorscale': build_colorscale(colorscale_name, 'linear')
+                },
+                **mapping_options
+            }],
             'layout': {
                 'xaxis': {
                     'type': 'linear',
@@ -833,7 +850,7 @@ def build_histogram_default_bins(
                 'type': 'bar', 'x': bin_edges, 'y': counts,
                 'marker': {
                     'color': counts,
-                    'colorscale': build_colorscale(colorscale_name, 'linear')         
+                    'colorscale': build_colorscale(colorscale_name, 'linear')
                 },
                 **mapping_options
 
@@ -855,7 +872,7 @@ def build_histogram_default_bins(
                 'hovermode': 'closest'
             }
         }
-    
+
     if column not in selections:
         for i in range(len(fig['data'])):
             fig['data'][i]['selectedpoints'] = False
@@ -904,10 +921,12 @@ def build_updated_figures(
 
     # if relayout_data is not None:
     transformer_4326_to_3857 = Transformer.from_crs("epsg:4326", "epsg:3857")
+
     def epsg_4326_to_3857(coords):
         return [transformer_4326_to_3857.transform(*reversed(row)) for row in coords]
-    
-    coordinates_4326 = relayout_data and relayout_data.get('mapbox._derived', {}).get('coordinates', None)
+
+    coordinates_4326 = relayout_data and relayout_data.get(
+        'mapbox._derived', {}).get('coordinates', None)
     dragmode = relayout_data and 'dragmode' in relayout_data and coordinates_4326_backup is not None
 
     if dragmode:
@@ -916,8 +935,10 @@ def build_updated_figures(
         position = position_backup
     elif coordinates_4326:
         lons, lats = zip(*coordinates_4326)
-        lon0, lon1 = max(min(lons), data_4326[0][0]), min(max(lons), data_4326[1][0])
-        lat0, lat1 = max(min(lats), data_4326[0][1]), min(max(lats), data_4326[1][1])
+        lon0, lon1 = max(min(lons), data_4326[0][0]), min(
+            max(lons), data_4326[1][0])
+        lat0, lat1 = max(min(lats), data_4326[0][1]), min(
+            max(lats), data_4326[1][1])
         coordinates_4326 = [
             [lon0, lat0],
             [lon1, lat1],
@@ -948,11 +969,10 @@ def build_updated_figures(
         [coordinates_4326[0][0], coordinates_4326[0][1]],
     ]
 
-
     x_range, y_range = zip(*coordinates_3857)
     x0, x1 = x_range
     y0, y1 = y_range
-        
+
     if selected_map is not None:
         coordinates_4326 = selected_map['range']['mapbox']
         coordinates_3857 = epsg_4326_to_3857(coordinates_4326)
@@ -965,11 +985,10 @@ def build_updated_figures(
     for col in selected:
         _min, _, _max = selected[col].split(' <= ')
         df_hists = query_df_range(df_hists, col, int(_min), int(_max))
-    
+
     datashader_plot = build_datashader_plot(
         df_hists, aggregate_column, colorscale_name, colorscale_transform, new_coordinates, position, x_range, y_range)
 
-    
     # Build indicator figure
     n_selected_indicator = {
         'data': [{
@@ -991,7 +1010,7 @@ def build_updated_figures(
             'margin': {'l': 10, 'r': 10, 't': 10, 'b': 10}
         }
     }
-    
+
     education_histogram = build_histogram_default_bins(
         df, 'education', selected, 'v', colorscale_name, colorscale_transform
     )
@@ -1007,7 +1026,6 @@ def build_updated_figures(
     age_histogram = build_histogram_default_bins(
         df, 'age', selected, 'v', colorscale_name, colorscale_transform
     )
-
 
     return (
         datashader_plot, education_histogram, income_histogram,
@@ -1026,16 +1044,21 @@ def register_update_plots_callback(client):
     @app.callback(
         [
             Output('indicator-graph', 'figure'), Output('map-graph', 'figure'),
-            Output('education-histogram', 'figure'), Output('income-histogram', 'figure'),
+            Output('education-histogram',
+                   'figure'), Output('income-histogram', 'figure'),
             Output('cow-histogram', 'figure'), Output('age-histogram', 'figure'),
             Output('map-graph', 'config'), Output('education-histogram', 'config'),
-            Output('income-histogram', 'config'), Output('cow-histogram', 'config'),
-            Output('age-histogram', 'config'), Output('intermediate-state-value', 'children'),
+            Output('income-histogram',
+                   'config'), Output('cow-histogram', 'config'),
+            Output('age-histogram',
+                   'config'), Output('intermediate-state-value', 'children'),
         ],
         [
             Input('map-graph', 'relayoutData'), Input('map-graph', 'selectedData'),
-            Input('education-histogram', 'selectedData'), Input('income-histogram', 'selectedData'),
-            Input('cow-histogram', 'selectedData'), Input('age-histogram', 'selectedData'), 
+            Input('education-histogram',
+                  'selectedData'), Input('income-histogram', 'selectedData'),
+            Input('cow-histogram',
+                  'selectedData'), Input('age-histogram', 'selectedData'),
             Input('colorscale-dropdown', 'value'), Input('gpu-toggle', 'on')
         ],
         [
@@ -1076,29 +1099,30 @@ def register_update_plots_callback(client):
         figures = figures_d.compute()
 
         (datashader_plot, education_histogram, income_histogram,
-        cow_histogram, age_histogram, n_selected_indicator,
-        coordinates_4326_backup, position_backup) = figures
+         cow_histogram, age_histogram, n_selected_indicator,
+         coordinates_4326_backup, position_backup) = figures
 
         barchart_config = {
-                'displayModeBar':True,
-                
-                'modeBarButtonsToRemove': [
-                    'zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d',
-                    'resetScale2d', 'hoverClosestCartesian', 'hoverCompareCartesian', 'toggleSpikelines'
-                ]
-            }
+            'displayModeBar': True,
+
+            'modeBarButtonsToRemove': [
+                'zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d', 'zoomOut2d',
+                'resetScale2d', 'hoverClosestCartesian', 'hoverCompareCartesian', 'toggleSpikelines'
+            ]
+        }
 
         print(f"Update time: {time.time() - t0}")
         return (
             n_selected_indicator, datashader_plot, education_histogram,
             income_histogram, cow_histogram, age_histogram,
             {
-                'displayModeBar':True,
-                'modeBarButtonsToRemove': ['lasso2d', 'zoomInMapbox', 'zoomOutMapbox', 'toggleHover']            
+                'displayModeBar': True,
+                'modeBarButtonsToRemove': ['lasso2d', 'zoomInMapbox', 'zoomOutMapbox', 'toggleHover']
             },
-            barchart_config, barchart_config, barchart_config, barchart_config, 
+            barchart_config, barchart_config, barchart_config, barchart_config,
             (coordinates_4326_backup, position_backup)
         )
+
 
 def check_dataset(dataset_url, data_path):
     if not os.path.exists(data_path):
@@ -1158,7 +1182,7 @@ def publish_dataset_to_cluster():
 
     # Precompute field bounds
     c_df_d = client.get_dataset('c_df_d')
-    
+
     # Register top-level callback that updates plots
     register_update_plots_callback(client)
 
@@ -1174,4 +1198,5 @@ if __name__ == '__main__':
     publish_dataset_to_cluster()
 
     # Launch dashboard
-    app.run_server(debug=False, dev_tools_silence_routes_logging=True, host='0.0.0.0')
+    app.run_server(
+        debug=False, dev_tools_silence_routes_logging=True, host='0.0.0.0')
