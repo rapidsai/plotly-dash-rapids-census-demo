@@ -1,6 +1,6 @@
-# Plot.ly-Dash + RAPIDS | Census 2010 | Covid-19 Visualization
+# Plot.ly Dash + RAPIDS | Census 2010 | COVID-19 Visualization
 
-![screenshot](./RAPIDS-plotly%20Census-CV19%20v2.png)
+![screenshot](./RAPIDS-plotly%20Census-CV19.png)
 
 # Overview
 
