@@ -1,20 +1,20 @@
 # Plot.ly-Dash + RAPIDS | Census 2010 Visualization
 
-![](./demo.png)
+![](./census-demo.png)
 
 # Installation and Run Steps [Work In Progress]
 
 ## Base Layer Setup
-The visualization uses a Mapbox base layer that requires an access token. Create one for free [here](https://www.mapbox.com/help/define-access-token/). Go to the demo root directory `plotly_demo/` and create a token file named `.mapbox_token`. Copy your token contents into the file.
+The visualization uses a Mapbox base layer that requires an access token. Create one for free [here](https://www.mapbox.com/help/define-access-token/). Go to the demo root directory's `plotly_demo` folder and create a token file named `.mapbox_token`. Copy your token contents into the file. **NOTE:** Installation may fail without the token.
 
 ## Running the Visualization App
 
-You can setup and run the visualization with the conda or docker commands below. Once the app is started, it will look for the datasets locally and if not found will download them.
+You can setup and run the visualization with the conda or docker commands below. Once the app is started, it will look for the datasets locally and, if not found, will download them.
 
 ## Data 
 There is 1 main dataset:
 
-- 2010 Census for Population Density (~2.9 GB) | download on first run
+- 2010 Census for Population Density, combined with the 2010 ACS for demographics  (~2.9 GB) | downloaded on first run
 
 For more information on how the Census and ACS data was prepared to show individual points, refer to the `/data_prep` folder.
 
@@ -67,30 +67,24 @@ docker run --gpus all -d -p 8050:8050 plotly_demo
 
 
 ## FAQ and Known Issues
-*What hardware do I need to run this locally?*
-To run you need an NVIDIA GPU with at least 24GB of memory, and a Linux OS as defined in the [RAPIDS requirements](https://rapids.ai/start.html#req).
+**What hardware do I need to run this locally?** To run you need an NVIDIA GPU with at least 24GB of memory, at least 32GB of system memory, and a Linux OS as defined in the [RAPIDS requirements](https://rapids.ai/start.html#req).
 
-*How are the population and case counts filtered?*
-Zooming in or out of a region on the map filters the data to that only displayed. 
+**How are the population and distributions filtered?** Use the box select tool icon for the map or click and drag for the bar charts.
 
-*Why is the population data from 2010?*
-Only census data is recorded on a block level. For more details on census boundaries refer to the [TIGERweb app](https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_apps.html). 
+**Why is the population data from 2010?** Only census data is recorded on a block level, which provides the highest resolution population distirbutions available. For more details on census boundaries refer to the [TIGERweb app](https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_apps.html). 
 
-*How did you get individual point locations?*
-The population density points are randomly placed within a census block and associated to match distribution counts at a census block level. As such, they are not actual individuals, only a statistical representation of one.
+**How did you get individual point locations?** The population density points are randomly placed within a census block and associated to match distribution counts at a census block group level. As such, they are not actual individuals, only a statistical representation of one, and some groupings may be artificial. 
 
-*The dashboard stop responding or the chart data disappeared!*
-Try using the 'clear all selections' button. If that does no work, use the 'reset GPU' button and then refresh the page. This usually resolves any issue. 
+**The dashboard stop responding or the chart data disappeared!** This is likely caused by an Out of Memory Error and the application must be restarted. 
 
-*How do I request a feature or report a bug?*
-Create an [Issue](https://github.com/rapidsai/plotly-dash-rapids-census-demo/issues) and we will get to it asap. 
+**How do I request a feature or report a bug?** Create an [Issue](https://github.com/rapidsai/plotly-dash-rapids-census-demo/issues) and we will get to it asap. 
 
 
 ## Acknowledgments and Data Sources
 
-- 2010 Population Census and 2018 ACS data used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](www.nhgis.org) ( not for redistribution )
-- Base map layer provided by [mapbox](https://www.mapbox.com/)
-- Dashboard developed with Plot.ly [Dash](https://dash.plotly.com/)
+- 2010 Population Census and 2018 ACS data used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](https://www.nhgis.org/) ( not for redistribution )
+- Base map layer provided by [Mapbox](https://www.mapbox.com/)
+- Dashboard developed with [Plot.ly Dash](https://plotly.com/dash/)
 - Geospatial point rendering developed with [Datashader](https://datashader.org/)
-- GPU accelerated with [RAPIDS](https://rapids.ai/) [cudf](https://github.com/rapidsai/cudf) and [cupy](https://cupy.chainer.org/) libraries
-- For source code visit our [GitHub](https://github.com/rapidsai/plotly-dash-rapids-census-demo)
+- GPU accelerated with [RAPIDS cudf](https://rapids.ai/) and [cupy](https://cupy.chainer.org/) | CPU with the [pandas](https://pandas.pydata.org/)
+- For source code and data workflow, visit our [GitHub](https://github.com/rapidsai/plotly-dash-rapids-census-demo/tree/master)

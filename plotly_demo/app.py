@@ -448,11 +448,11 @@ app.layout = html.Div(children=[
                     style={"margin-top": "0"}),
             dcc.Markdown('''\
 - 2010 Population Census and 2018 ACS data used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](https://www.nhgis.org/) ( not for redistribution )
-- Base map layer provided by mapbox
-- Dashboard developed with Plot.ly Dash
-- Geospatial point rendering developed with Datashader
-- GPU accelerated with RAPIDS cudf and cupy libraries. CPU using pandas libraries.
-- For source code visit our GitHub
+- Base map layer provided by [Mapbox](https://www.mapbox.com/)
+- Dashboard developed with [Plot.ly Dash](https://plotly.com/dash/)
+- Geospatial point rendering developed with [Datashader](https://datashader.org/)
+- GPU accelerated with [RAPIDS cudf](https://rapids.ai/) and [cupy](https://cupy.chainer.org/) | CPU with the [pandas](https://pandas.pydata.org/)
+- For source code and data workflow, visit our [GitHub](https://github.com/rapidsai/plotly-dash-rapids-census-demo/tree/master)
 '''),
         ],
         style={
