@@ -116,7 +116,7 @@
     line-height: 1.6;
     font-weight: 400;
     font-family: "Open Sans", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
-    color: #cfd8dc;  /* Material blue-grey 100 */
+    color:#cfd8dc;  /* Material blue-grey 100 */
     background-color: #2a2a2e;  /* Material blue-grey 900*/
     margin: 2%;
   }
@@ -132,10 +132,10 @@
     margin-top: 0;
     margin-bottom: 0;
     font-weight: 300; }
-  h1 { font-size: 3.5rem; line-height: 1.2;  letter-spacing: -.1rem; margin-bottom: 2rem; }
-  h2 { font-size: 3.2rem; line-height: 1.25; letter-spacing: -.1rem; margin-bottom: 1.8rem; margin-top: 1.8rem;}
-  h3 { font-size: 3.0rem; line-height: 1.3;  letter-spacing: -.1rem; margin-bottom: 1.5rem; margin-top:4.5rem;}
-  h4 { font-size: 2.6rem; line-height: 1.35; letter-spacing: -.08rem; margin-bottom: 1.2rem; margin-top: 1.2rem;}
+  h1 { font-size: 3.0rem; line-height: 1.2;  letter-spacing: -.1rem; margin-bottom: 0rem; }
+  h2 { font-size: 3.0rem; line-height: 1.25; letter-spacing: -.1rem; margin-bottom: 1.8rem; margin-top: 1.8rem;}
+  h3 { font-size: 2.6rem; line-height: 1.3;  letter-spacing: -.1rem; margin-bottom: 1.5rem; margin-top:4.5rem;}
+  h4 { font-size: 2.0rem; line-height: 1.35; letter-spacing: -.08rem; margin-bottom: 1.2rem; margin-top: 1.2rem;}
   h5 { font-size: 2.2rem; line-height: 1.5;  letter-spacing: -.05rem; margin-bottom: 0.6rem; margin-top: 0.6rem;}
   h6 { font-size: 2.0rem; line-height: 1.6;  letter-spacing: 0; margin-bottom: 0.75rem; margin-top: 0.75rem;}
   
@@ -412,7 +412,8 @@
   .pretty_container {
     border-radius: 5px;
     background-color: #191a1a;  /* Mapbox light map land color */
-    margin: 1%;
+    margin: 0.5%;
+    margin-left: 1.5%; /* overriden on 1st child */
     padding: 1%;
     position: relative;
     box-shadow: 1px 1px 1px black;
@@ -421,8 +422,8 @@
   .container_title {
     margin-top: 0;
     margin-bottom: 0.5em;
-    font-size: 2.4rem;
-    line-height: 2.4rem;
+    font-size: 2rem;
+    line-height: 2rem;
   }
   
   /* Customize Loading Spinner
@@ -442,8 +443,8 @@
   .reset-button {
     /* width: 100%; */
     margin-top: -5px;
-    height: 36px;
-    line-height: 36px;
+    height: 30px;
+    line-height: 15px;
     float: right;
   }
   

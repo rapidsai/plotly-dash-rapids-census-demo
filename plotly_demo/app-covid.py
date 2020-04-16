@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 import time
 import os
-import json
 import tarfile
-import shutil
 import requests
 import numpy as np
 import datashader as ds
@@ -23,7 +21,6 @@ from distributed import Client
 from dask_cuda import LocalCUDACluster
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import plotly.express as px
 import datetime
 import cudf
 import pandas as pd
@@ -59,7 +56,7 @@ template = {
 }
 
 colors = {
-    'age': ['#C700E5','#9D00DB', '#7300D2','#4900C8','#1F00BF'],
+    'age': ['#C700E5', '#9D00DB', '#7300D2', '#4900C8', '#1F00BF'],
 }
 
 # Load mapbox token from environment variable or file
@@ -77,6 +74,8 @@ cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4 = None, None, None, None
 data_center_3857, data_3857, data_4326, data_center_4326 = [], [], [], []
 coordinates_4326_backup, position_backup = None, None
 relayout_data_backup = None
+
+
 def load_dataset(path):
     """
     Args:
@@ -91,15 +90,15 @@ def load_dataset(path):
     if 'age' in df_d.columns:
         # convert age column to category dtype in census 2010 dataset
         df_d.drop_column('sex')
-        df_d['age'][df_d['age']<=20] = 1
-        mask_ = (df_d['age']>20) & (df_d['age']<=40)
+        df_d['age'][df_d['age'] <= 20] = 1
+        mask_ = (df_d['age'] > 20) & (df_d['age'] <= 40)
         df_d['age'][mask_] = 2
-        mask_ = (df_d['age']>40) & (df_d['age']<=50)
+        mask_ = (df_d['age'] > 40) & (df_d['age'] <= 50)
         df_d['age'][mask_] = 3
-        mask_ = (df_d['age']>50) & (df_d['age']<=60)
+        mask_ = (df_d['age'] > 50) & (df_d['age'] <= 60)
         df_d['age'][mask_] = 4
         del(mask_)
-        df_d['age'][df_d['age']>60] = 5
+        df_d['age'][df_d['age'] > 60] = 5
         df_d['age'] = df_d.age.to_pandas().astype('category')
     return df_d
 
@@ -121,7 +120,8 @@ def resolve_missing_counties(df, df_):
             df_not_in_yesterday[str(i)] = 0
     df_not_in_yesterday['Last_Update'] = df_not_in_yesterday['Last_Update_']
     df_not_in_yesterday = df_not_in_yesterday[df_.columns]
-    df_ = cudf.concat([df_, df_not_in_yesterday]).sort_values('COUNTY').reset_index()
+    df_ = cudf.concat([df_, df_not_in_yesterday]
+                      ).sort_values('COUNTY').reset_index()
     return df, df_
 
 
@@ -134,7 +134,8 @@ def load_covid(BASE_URL, acs_path):
     df_temp = []
     df_acs2018 = load_dataset(acs_path)
     last_n_days = (datetime.date.today() - datetime.date(2020, 3, 25)).days
-    today = (datetime.date.today() - datetime.timedelta(days=1)).strftime("%m-%d-%Y")
+    today = (datetime.date.today() -
+             datetime.timedelta(days=1)).strftime("%m-%d-%Y")
 
     if requests.get(BASE_URL % (datetime.date.today()).strftime("%m-%d-%Y")).status_code == 200:
         today = (datetime.date.today()).strftime("%m-%d-%Y")
@@ -143,7 +144,8 @@ def load_covid(BASE_URL, acs_path):
     if not os.path.exists(path):
         print('downloading latest covid dataset...')
         for i in range(last_n_days):
-            date_ = str((datetime.date.today() - datetime.timedelta(days=i)).strftime("%m-%d-%Y"))
+            date_ = str((datetime.date.today() -
+                         datetime.timedelta(days=i)).strftime("%m-%d-%Y"))
             if requests.get(BASE_URL % date_).status_code == 404:
                 continue
             path = '../data/'+date_+'.parquet'
@@ -151,8 +153,9 @@ def load_covid(BASE_URL, acs_path):
                 df_temp.append(
                     cudf.from_pandas(
                         pd.read_csv(BASE_URL % date_,
-                            usecols=['Lat', 'Long_','Province_State', 'Last_Update', 'Confirmed', 'Deaths', 'Country_Region', 'Combined_Key']
-                        ).query('Country_Region == "US" and Confirmed != 0')
+                                    usecols=['Lat', 'Long_', 'Province_State', 'Last_Update',
+                                             'Confirmed', 'Deaths', 'Country_Region', 'Combined_Key']
+                                    ).query('Country_Region == "US" and Confirmed != 0')
                     )
                 )
             else:
@@ -176,29 +179,36 @@ def load_covid(BASE_URL, acs_path):
     }, inplace=True)
     df_combined_key.drop_duplicates(inplace=True)
 
-    df.Last_Update = pd.to_datetime(df.Last_Update.str.split(' ')[0].to_pandas().astype('str'))
+    df.Last_Update = pd.to_datetime(df.Last_Update.str.split(' ')[
+                                    0].to_pandas().astype('str'))
     df.rename({
         'Combined_Key': 'COUNTY'
     }, inplace=True)
-    df_states_last_n_days = df.groupby(['Province_State','Last_Update']).sum().reset_index().to_pandas()
-    df_county = df.groupby(['COUNTY','Last_Update']).agg(
+    df_states_last_n_days = df.groupby(
+        ['Province_State', 'Last_Update']).sum().reset_index().to_pandas()
+    df_county = df.groupby(['COUNTY', 'Last_Update']).agg(
         {
-            'Deaths': 'sum', 
+            'Deaths': 'sum',
             'Confirmed': 'sum',
         }
     ).reset_index()
     df_county = df_county.merge(df_combined_key, on='COUNTY')
-    df_county.Last_Update = pd.to_datetime(df_county.Last_Update.str.split(' ')[0].to_pandas().astype('str'))
+    df_county.Last_Update = pd.to_datetime(df_county.Last_Update.str.split(' ')[
+                                           0].to_pandas().astype('str'))
 
     # keep separate dataframes for last 2 days
     last_2_days = np.sort(df_county.Last_Update.unique().to_array())[-2:]
-    df_count_latest = df_county.query('Last_Update == @last_2_days[-1]').drop_duplicates('COUNTY').reset_index(drop=True)
+    df_count_latest = df_county.query(
+        'Last_Update == @last_2_days[-1]').drop_duplicates('COUNTY').reset_index(drop=True)
 
-    df_count_latest_minus_1 = df_county.query('Last_Update == @last_2_days[0]').drop_duplicates('COUNTY').reset_index(drop=True)
-    df_count_latest, df_count_latest_minus_1 = resolve_missing_counties(df_count_latest, df_count_latest_minus_1)
+    df_count_latest_minus_1 = df_county.query(
+        'Last_Update == @last_2_days[0]').drop_duplicates('COUNTY').reset_index(drop=True)
+    df_count_latest, df_count_latest_minus_1 = resolve_missing_counties(
+        df_count_latest, df_count_latest_minus_1)
 
     df_county_ratio = df_count_latest.merge(df_acs2018, on='COUNTY')
     return (df_states_last_n_days, df_count_latest, df_count_latest_minus_1, df_county_ratio)
+
 
 def load_hospitals(path):
     '''
@@ -207,15 +217,19 @@ def load_hospitals(path):
     df_hospitals = pd.read_csv(path, usecols=['X', 'Y', 'BEDS', 'NAME'])
     df_hospitals['BEDS_label'] = df_hospitals.BEDS.replace(-999, 'unknown')
     df_hospitals.BEDS = df_hospitals.BEDS.replace(-999, 0)
-    df_hospitals['BEDS_sizes'] = df_hospitals.BEDS.apply(lambda x: x if x > 150 else 150)
+    df_hospitals['BEDS_sizes'] = df_hospitals.BEDS.apply(
+        lambda x: x if x > 150 else 150)
     return df_hospitals
+
 
 def set_projection_bounds(df_d):
     transformer_4326_to_3857 = Transformer.from_crs("epsg:4326", "epsg:3857")
+
     def epsg_4326_to_3857(coords):
         return [transformer_4326_to_3857.transform(*reversed(row)) for row in coords]
 
     transformer_3857_to_4326 = Transformer.from_crs("epsg:3857", "epsg:4326")
+
     def epsg_3857_to_4326(coords):
         return [list(reversed(transformer_3857_to_4326.transform(*row))) for row in coords]
 
@@ -234,6 +248,8 @@ def set_projection_bounds(df_d):
     return data_3857, data_center_3857, data_4326, data_center_4326
 
 # Build Dash app and initial layout
+
+
 def blank_fig(height):
     """
     Build blank figure with the requested height
@@ -255,22 +271,32 @@ def blank_fig(height):
 
 app = dash.Dash(__name__)
 app.layout = html.Div(children=[
-    html.Div([
-        html.H1(children=[
-            'COVID-19 Cases Overlaid on US Census Data',
+    html.Div(children=[
+        html.Div(children=[
+            html.H1(
+                'COVID-19 Cases Overlaid on US Census Data'),
+            html.H4(
+                'A Community Developed Open Source Project')
+        ],
+            style={'float': 'left'}),
+        html.Div(children=[
             html.A(
                 html.Img(
                     src="assets/rapids-logo.png",
-                    style={'float': 'right', 'height': '55px', 'margin-top': '-10px', 'margin-right': '20px'}
-                ), href="https://rapids.ai/"),
+                    style={'float': 'right', 'height': '55px',
+                           'margin-top': '-10px', 'margin-right': '20px'}
+                ),
+                href="https://rapids.ai/"),
             html.A(
                 html.Img(
                     src="assets/dash-logo.png",
                     style={'float': 'right', 'height': '35px'}
-                ), href="https://dash.plot.ly/"),
-
-        ], style={'text-align': 'left'}),
-    ]),
+                ),
+                href="https://dash.plot.ly/")
+        ],
+            style={'float': 'right'}),
+    ],
+        className='twelve columns'),
     html.Div(children=[
         html.Div(children=[
             html.Div(children=[
@@ -281,11 +307,11 @@ app.layout = html.Div(children=[
                         """
                     ),
                 ], className="container_title"),
-                   dcc.Graph(
-                        id='indicator-graph',
-                        figure=blank_fig(row_heights[5]),
-                        config={'displayModeBar': False},
-                    )
+                dcc.Graph(
+                    id='indicator-graph',
+                    figure=blank_fig(row_heights[5]),
+                    config={'displayModeBar': False},
+                )
             ],  style={'height': row_heights[0]}, className='seven columns pretty_container', id="indicator-div"),
             html.Div(children=[
                 html.H4([
@@ -310,14 +336,15 @@ app.layout = html.Div(children=[
                             html.Td(dcc.Dropdown(
                                 id='colorscale-dropdown-population',
                                 options=[
-                                    {'label': 'Age by '+cs+' Color Scale' if cs == 'Purblue' else 'Total by '+cs+' Color Scale', 'value': cs}
+                                    {'label': 'Age by '+cs+' Color Scale' if cs ==
+                                        'Purblue' else 'Total by '+cs+' Color Scale', 'value': cs}
                                     for cs in ['Purblue', 'Viridis', 'Cividis', 'Plasma']
                                 ],
                                 value='Purblue',
                                 searchable=False,
                                 clearable=False,
-                            ), style={'width': '50%', 'height':'15px'}),
-                        ]),
+                            ), style={'width': '50%', 'height': '15px'}),
+                            ]),
                     html.Tr([
                             html.Td(
                                 html.Div("Hospital Beds"), className="config-label"
@@ -340,8 +367,8 @@ app.layout = html.Div(children=[
                                 value='white',
                                 searchable=False,
                                 clearable=False,
-                            ), style={'width': '50%','height':'15px'}),
-                        ]),
+                            ), style={'width': '50%', 'height': '15px'}),
+                            ]),
                     html.Tr([
                             html.Td(
                                 html.Div("COVID-19 Cases"), className="config-label"
@@ -358,25 +385,27 @@ app.layout = html.Div(children=[
                                 id='covid_count_type',
                                 options=[
                                     {'label': 'Total Cases', 'value': 0},
-                                    {'label': 'Percentage Increase of Last 2 Days', 'value': 1},
+                                    {'label': 'Percentage Increase of Last 2 Days',
+                                        'value': 1},
                                     {'label': 'Case Per Capita by County', 'value': 2},
                                 ],
                                 value=0,
                                 searchable=False,
                                 clearable=False,
-                            ), style={'width': '50%', 'height':'15px'}),
-                        ])
+                            ), style={'width': '50%', 'height': '15px'}),
+                            ])
                 ], style={'width': '100%'}),
             ],   style={'height': row_heights[0]}, className='five columns pretty_container', id="config-div"),
         ]),
         html.Div(children=[
-            html.Button("Clear Selection", id='reset-map', className='reset-button'),
+            html.Button("Clear Selection", id='reset-map',
+                        className='reset-button'),
             html.Div([
                 dash_dangerously_set_inner_html.DangerouslySetInnerHTML(
-                        """
+                    """
                         <h4 class='container_title'>Pan and Zoom Map with Mouse | Filter Data with Box Select Tool</h4>
                         """
-                    )
+                )
             ], className="container_title"),
             dcc.Graph(
                 id='map-graph',
@@ -390,32 +419,32 @@ app.layout = html.Div(children=[
             style={
                 'width': '98%',
                 'margin-right': '0',
-            },
+        },
             id="map-div"
         ),
         html.Div(children=[
             html.Div(
                 children=[
                     html.Div(dcc.Dropdown(
-                                id='scale-covid-dropdown',
-                                options=[
-                                    {'label': 'Log scale', 'value': 'log'},
-                                    {'label': 'Linear scale', 'value': 'linear'},
-                                ],
-                                value='linear',
-                                searchable=False,
-                                clearable=False,
-                            ), style={'width': '10%', 'height':'30px', 'float': 'right', 'margin': '0px 10px'}),
+                        id='scale-covid-dropdown',
+                        options=[
+                            {'label': 'Log scale', 'value': 'log'},
+                            {'label': 'Linear scale', 'value': 'linear'},
+                        ],
+                        value='linear',
+                        searchable=False,
+                        clearable=False,
+                    ), style={'width': '10%', 'height': '30px', 'float': 'right', 'margin': '0px 10px'}),
                     html.Div(dcc.Dropdown(
-                                id='category-covid-dropdown',
-                                options=[
-                                    {'label': 'Total cases', 'value': 0},
-                                    {'label': 'Total deaths', 'value': 1}
-                                ],
-                                value=0,
-                                searchable=False,
-                                clearable=False,
-                            ), style={'width': '10%', 'height':'30px', 'float': 'right'}),
+                        id='category-covid-dropdown',
+                        options=[
+                            {'label': 'Total cases', 'value': 0},
+                            {'label': 'Total deaths', 'value': 1}
+                        ],
+                        value=0,
+                        searchable=False,
+                        clearable=False,
+                    ), style={'width': '10%', 'height': '30px', 'float': 'right'}),
                     html.Div([
                         dash_dangerously_set_inner_html.DangerouslySetInnerHTML(
                             """
@@ -430,7 +459,7 @@ app.layout = html.Div(children=[
                         figure=blank_fig(row_heights[3]),
                         animate=True
                     ),
-                    style={'height': row_heights[3]}),
+                        style={'height': row_heights[3]}),
                 ],
                 className='twelve columns pretty_container', id="covid-div"
             )
@@ -438,9 +467,10 @@ app.layout = html.Div(children=[
     ]),
     html.Div(
         [
-            html.H4('Acknowledgments and Data Sources', style={"margin-top": "0"}),
+            html.H4('Acknowledgments and Data Sources',
+                    style={"margin-top": "0"}),
             dcc.Markdown(f'''
-- Dashboard last updated on {last_update}
+- The goal of this dashboard is to help COVID-19 decision makers. Still in active development, we are soliciting feedback from the community to help improve it. Dashboard last updated on {last_update}
 - 1: US Population data is from 2010 Census and 2018 ACS, sourced with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](www.nhgis.org) ( not for redistribution )
 - 2: Hospital data is from [HIFLD](https://hifld-geoplatform.opendata.arcgis.com/datasets/hospitals) ( Updated Oct-07-2019 ) and does not contain emergency field hospitals
 - 3: COVID-19 data is from the [Johns Hopkins University](https://coronavirus.jhu.edu/) data on [GitHub](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) ( Updated {covid_last_update_date} )
@@ -450,7 +480,7 @@ app.layout = html.Div(children=[
 - GPU accelerated with [RAPIDS](https://rapids.ai/) [cudf](https://github.com/rapidsai/cudf) and [cupy](https://cupy.chainer.org/) libraries
 - Cloud hosting provided by [Google](https://cloud.google.com/)
 - For more information, reach out on this [Covid-19 Slack Channel](https://join.slack.com/t/rapids-goai/shared_invite/zt-2qmkjvzl-K3rVHb1rZYuFeczoR9e4EA)
-- For source code, bug notes, or feature requests, visit our [GitHub](https://github.com/rapidsai/plotly-dash-rapids-census-demo)
+- For source code, bug notes, feature requests, or to contribute, visit our [GitHub page](https://github.com/rapidsai/plotly-dash-rapids-census-demo)
 '''),
         ],
         style={
@@ -463,6 +493,8 @@ app.layout = html.Div(children=[
 ])
 
 # Plot functions
+
+
 def build_colorscale(colorscale_name, transform, agg, agg_col):
     """
     Build plotly colorscale
@@ -476,7 +508,6 @@ def build_colorscale(colorscale_name, transform, agg, agg_col):
         Plotly color scale list
     """
     global colors, mappings
-
 
     colors_temp = getattr(sequential, colorscale_name)
     if transform == "linear":
@@ -526,29 +557,29 @@ def build_datashader_plot(
     map_graph = {
         'data': [],
         'layout': {
-                'template': template,
-                'uirevision': True,
-                'mapbox': {
-                    'style': mapbox_style,
-                    'accesstoken': token,
-                },
-                'margin': {"r": 140, "t": 0, "l": 0, "b": 0},
-                'height': 500,
-                'shapes': [{
-                    'type': 'rect',
-                    'xref': 'paper',
-                    'yref': 'paper',
-                    'x0': 0,
-                    'y0': 0,
-                    'x1': 1,
-                    'y1': 1,
-                    'line': {
+            'template': template,
+            'uirevision': True,
+            'mapbox': {
+                'style': mapbox_style,
+                'accesstoken': token,
+            },
+            'margin': {"r": 140, "t": 0, "l": 0, "b": 0},
+            'height': 500,
+            'shapes': [{
+                'type': 'rect',
+                'xref': 'paper',
+                'yref': 'paper',
+                'x0': 0,
+                'y0': 0,
+                'x1': 1,
+                'y1': 1,
+                'line': {
                         'width': 1,
                         'color': '#191a1a',
-                    }
-                }],
-                'showlegend': False
-            }
+                }
+            }],
+            'showlegend': False
+        }
     }
     if population_enabled and len(df) > 0:
         global data_3857, data_center_3857, data_4326, data_center_4326
@@ -557,11 +588,12 @@ def build_datashader_plot(
 
         if population_colorscale == 'Purblue':
             aggregate_column = 'age'
-            datashader_color_scale['color_key'] = colors[aggregate_column] 
+            datashader_color_scale['color_key'] = colors[aggregate_column]
         else:
             aggregate_column = 'x'
             aggregate = 'count'
-            datashader_color_scale['cmap'] = [i[1] for i in build_colorscale(population_colorscale, colorscale_transform, aggregate, aggregate_column)]
+            datashader_color_scale['cmap'] = [i[1] for i in build_colorscale(
+                population_colorscale, colorscale_transform, aggregate, aggregate_column)]
             if not isinstance(df, cudf.DataFrame):
                 df[aggregate_column] = df[aggregate_column].astype('int8')
 
@@ -591,8 +623,7 @@ def build_datashader_plot(
         else:
             # Shade aggregation into an image that we can add to the map as a mapbox
             # image layer
-            img = tf.shade(agg, how='log',**datashader_color_scale).to_pil()
-
+            img = tf.shade(agg, how='log', **datashader_color_scale).to_pil()
 
             # Add image as mapbox image layer. Note that as of version 4.4, plotly will
             # automatically convert the PIL image object into a base64 encoded png string
@@ -613,16 +644,17 @@ def build_datashader_plot(
             # for `Age By PurBlue` category
             colorscale = (10 ** np.linspace(0, 1, len(colors['age'])) - 1) / 9
             marker = dict(
-                    size=0,
-                    showscale=True,
-                    colorbar= {"title": {
-                        "text": 'Age', "side": "right", "font": {"size": 14}
-                    },
-                    "ypad":30},
-                    colorscale=[(v, clr) for v, clr in zip(colorscale, colors['age'])],
-                    cmin=0,
-                    cmax=65,
-                )
+                size=0,
+                showscale=True,
+                colorbar={"title": {
+                    "text": 'Age', "side": "right", "font": {"size": 14}
+                },
+                    "ypad": 30},
+                colorscale=[(v, clr)
+                            for v, clr in zip(colorscale, colors['age'])],
+                cmin=0,
+                cmax=65,
+            )
 
             map_graph['data'].append(
                 {
@@ -636,19 +668,19 @@ def build_datashader_plot(
             map_graph['layout']['annotations'] = []
         else:
             marker = dict(
-                    size=0,
-                    showscale=True,
-                    colorbar= {"title": {
-                        "text": 'Population', "side": "right", "font": {"size": 14}
-                    },
-                    "ypad":30},
-                    colorscale=build_colorscale(
-                        population_colorscale, colorscale_transform,
-                        aggregate, aggregate_column
-                    ),
-                    cmin=cmin,
-                    cmax=cmax
-                )
+                size=0,
+                showscale=True,
+                colorbar={"title": {
+                    "text": 'Population', "side": "right", "font": {"size": 14}
+                },
+                    "ypad": 30},
+                colorscale=build_colorscale(
+                    population_colorscale, colorscale_transform,
+                    aggregate, aggregate_column
+                ),
+                cmin=cmin,
+                cmax=cmax
+            )
             map_graph['data'].append(
                 {
                     'type': 'scattermapbox',
@@ -659,23 +691,22 @@ def build_datashader_plot(
                 }
             )
         # Build map figure
-        
 
         map_graph['layout']['mapbox'].update({'layers': layers})
     map_graph['layout']['mapbox'].update(position)
     selected_points = {}
     if selected_map is None:
         selected_points = {
-                'selectedpoints': False
+            'selectedpoints': False
         }
     else:
         selected_points = {
             'selectedpoints': [i['pointIndex'] for i in selected_map['points']]
         }
-    
+
     if df_hospitals is not None and isinstance(df_hospitals, pd.DataFrame):
         map_graph['data'].append(
-             {
+            {
                 'type': 'scattermapbox',
                 'lat': df_hospitals.Y.values,
                 'lon': df_hospitals.X.values,
@@ -689,28 +720,28 @@ def build_datashader_plot(
                 'hoverinfo': 'none'
             }
         )
-        
+
         map_graph['data'].append({
-                'type': 'scattermapbox',
-                'lat': df_hospitals.Y.values,
-                'lon': df_hospitals.X.values,
-                'marker': go.scattermapbox.Marker(
+            'type': 'scattermapbox',
+            'lat': df_hospitals.Y.values,
+            'lon': df_hospitals.X.values,
+            'marker': go.scattermapbox.Marker(
                     size=df_hospitals.BEDS_sizes.values,
                     sizemin=2,
                     color=hospital_colorscale,
                     opacity=0.9,
                     sizeref=120,
-                ),
-                'hovertemplate': (
-                    '<b>%{hovertext}</b> <br><br>Known Beds: <b>%{text} </b> <extra></extra>'
-                ),
-                'text': df_hospitals.BEDS,
-                'hovertext': df_hospitals.NAME,
-                'mode': 'markers',
-                'showlegend': False,
-                'subplot': 'mapbox',
-                **selected_points
-            }
+            ),
+            'hovertemplate': (
+                '<b>%{hovertext}</b> <br><br>Known Beds: <b>%{text} </b> <extra></extra>'
+            ),
+            'text': df_hospitals.BEDS,
+            'hovertext': df_hospitals.NAME,
+            'mode': 'markers',
+            'showlegend': False,
+            'subplot': 'mapbox',
+            **selected_points
+        }
         )
     if df_covid is not None:
         df_covid_yesterday = df_covid[2]
@@ -721,42 +752,47 @@ def build_datashader_plot(
         size_markers = np.copy(df_covid.Confirmed.to_array())
         size_markers_labels = np.copy(size_markers)
         annotations = {
-                'text': size_markers_labels
+            'text': size_markers_labels
         }
         if covid_count_type == 0:
             size_markers[size_markers <= 2] = 2
             factor = 'As of '+today+' <br>Cases: <b>%{text}</b> <br>'
             sizeref = size_markers.max()/500
-            
+
         if covid_count_type == 1:
-            size_markers_yesterday = np.copy(df_covid_yesterday.Confirmed.to_array())
+            size_markers_yesterday = np.copy(
+                df_covid_yesterday.Confirmed.to_array())
             size_markers_yesterday[size_markers_yesterday == 0] = 1
-            size_markers = (np.nan_to_num((size_markers - df_covid_yesterday.Confirmed.to_array())*100/size_markers_yesterday)).astype('int64')
+            size_markers = (np.nan_to_num(
+                (size_markers - df_covid_yesterday.Confirmed.to_array())*100/size_markers_yesterday)).astype('int64')
             size_markers_labels = np.copy(size_markers)
             size_markers = np.absolute(size_markers)
-            size_markers[size_markers>1000] = 1000
+            size_markers[size_markers > 1000] = 1000
             annotations = {
                 'text': size_markers_labels,
                 'customdata': np.vstack([df_covid_yesterday.Confirmed.to_array(), df_covid.Confirmed.to_array()]).T
             }
-            factor = 'Cases as of: <br>'+yesterday+': <b>%{customdata[0]}</b> <br>'+today+': %{customdata[1]} <br>Increase: <b> %{text} %</b> <br>'
+            factor = 'Cases as of: <br>'+yesterday + \
+                ': <b>%{customdata[0]}</b> <br>'+today + \
+                ': %{customdata[1]} <br>Increase: <b> %{text} %</b> <br>'
             sizeref = 15
 
         elif covid_count_type == 2:
             size_markers = np.nan_to_num(df_covid_county_ratio.Confirmed.to_array()/(df_covid_county_ratio.acs2018_population.to_array()/1000)).astype('float')
             size_markers_labels = np.around(size_markers, 2)
-            size_markers[size_markers>35] = 35
+            size_markers[size_markers > 35] = 35
             annotations = {
                 'text': size_markers_labels
             }
-            factor = 'Population Data from 2018 ACS <br>Cases Per 1000 People: <b> %{text} </b> <br>'
+            factor = 'Population Data from 2018 ACS <br> Cases Per 1000 People: <b> %{text} </b> <br>'
             sizeref = 0.3
-        
+
         marker_border = 2*sizeref
-        size_markers[size_markers >= np.percentile(size_markers, 99.9)] = np.percentile(size_markers, 99.9)
+        size_markers[size_markers >= np.percentile(
+            size_markers, 99.9)] = np.percentile(size_markers, 99.9)
 
         map_graph['data'].append(
-             {
+            {
                 'type': 'scattermapbox',
                 'lat': df_covid.Lat.to_array(),
                 'lon': df_covid.Long_.to_array(),
@@ -771,30 +807,30 @@ def build_datashader_plot(
             }
         )
         map_graph['data'].append({
-                'type': 'scattermapbox',
-                'lat': df_covid.Lat.to_array(),
-                'lon': df_covid.Long_.to_array(),
-                'marker': go.scattermapbox.Marker(
+            'type': 'scattermapbox',
+            'lat': df_covid.Lat.to_array(),
+            'lon': df_covid.Long_.to_array(),
+            'marker': go.scattermapbox.Marker(
                     size=size_markers,
                     sizemin=2,
                     color='#f20e5a',
                     opacity=0.6,
                     sizeref=sizeref,
-                ),
-                'hovertemplate': (
-                    '<b>%{hovertext}</b><br><br>'+factor+'<extra></extra>'
-                ),
-                **annotations,
-                'hovertext': df_covid.COUNTY,
-                'mode': 'markers',
-                'showlegend': False,
-                'subplot': 'mapbox',
-                **selected_points
-            }
+            ),
+            'hovertemplate': (
+                '<b>%{hovertext}</b><br><br>'+factor+'<extra></extra>'
+            ),
+            **annotations,
+            'hovertext': df_covid.COUNTY,
+            'mode': 'markers',
+            'showlegend': False,
+            'subplot': 'mapbox',
+            **selected_points
+        }
         )
 
-
     return map_graph
+
 
 def build_updated_figures(
         df, df_hospitals, df_covid, relayout_data, selected_map,
@@ -840,7 +876,8 @@ def build_updated_figures(
         return [
             transformer_4326_to_3857.transform(*reversed(row)) for row in coords
         ]
-    coordinates_4326 = relayout_data and relayout_data.get('mapbox._derived', {}).get('coordinates', None)
+    coordinates_4326 = relayout_data and relayout_data.get(
+        'mapbox._derived', {}).get('coordinates', None)
     dragmode = relayout_data and 'dragmode' in relayout_data and coordinates_4326_backup is not None
 
     if dragmode:
@@ -849,8 +886,10 @@ def build_updated_figures(
         position = position_backup
     elif coordinates_4326:
         lons, lats = zip(*coordinates_4326)
-        lon0, lon1 = max(min(lons), data_4326[0][0]), min(max(lons), data_4326[1][0])
-        lat0, lat1 = max(min(lats), data_4326[0][1]), min(max(lats), data_4326[1][1])
+        lon0, lon1 = max(min(lons), data_4326[0][0]), min(
+            max(lons), data_4326[1][0])
+        lat0, lat1 = max(min(lats), data_4326[0][1]), min(
+            max(lats), data_4326[1][1])
         coordinates_4326 = [
             [lon0, lat0],
             [lon1, lat1],
@@ -881,12 +920,12 @@ def build_updated_figures(
     ]
 
     x_range, y_range = zip(*coordinates_3857)
-    
+
     def query_df(df, x0, x1, y0, y1, x, y):
-        mask_ = (df[x]>=x0) & (df[x]<=x1) & (df[y]<=y0) & (df[y]>=y1)
+        mask_ = (df[x] >= x0) & (df[x] <= x1) & (df[y] <= y0) & (df[y] >= y1)
         if(mask_.sum() != len(df)):
             df = df[mask_]
-            df.index = cudf.core.RangeIndex(0,len(df))
+            df.index = cudf.core.RangeIndex(0, len(df))
         del(mask_)
         return df
 
@@ -897,8 +936,7 @@ def build_updated_figures(
         x0, x1 = x_range_t
         y0, y1 = y_range_t
         df = query_df(df, x0, x1, y0, y1, 'x', 'y')
-        
-    
+
     datashader_plot = build_datashader_plot(
         df, aggregate,
         aggregate_column, new_coordinates, position, x_range, y_range,
@@ -913,7 +951,8 @@ def build_updated_figures(
         x0, x1 = x_range_t
         y0, y1 = y_range_t
         if df_covid is not None:
-            df_covid = (df_covid[0], query_df(df_covid[1], x0, x1, y0, y1, 'Long_', 'Lat'), df_covid[2], df_covid[3])
+            df_covid = (df_covid[0], query_df(
+                df_covid[1], x0, x1, y0, y1, 'Long_', 'Lat'), df_covid[2], df_covid[3])
         if df_hospitals is not None:
             df_hospitals = query_df(df_hospitals, x0, x1, y0, y1, 'X', 'Y')
     # Build indicator figure
@@ -939,10 +978,11 @@ def build_updated_figures(
             'margin': {'l': 10, 'r': 10, 't': 10, 'b': 10}
         }
     }
-    n_selected_indicator['data'][0]['domain'] =  {'x': [0, 1], 'y': [0, 0.5]}
+    n_selected_indicator['data'][0]['domain'] = {'x': [0, 1], 'y': [0, 0.5]}
 
     if df_covid is not None:
-        n_selected_indicator['data'][0]['domain'] =  {'x': [0, 0.5], 'y': [0, 0.5]}
+        n_selected_indicator['data'][0]['domain'] = {
+            'x': [0, 0.5], 'y': [0, 0.5]}
         n_selected_indicator['data'].append({
             'title': {"text": "Total Cases"},
             'type': 'indicator',
@@ -958,12 +998,15 @@ def build_updated_figures(
         })
 
     if df_hospitals is not None:
-        n_selected_indicator['data'][0]['domain'] =  {'x': [0, 0.35], 'y': [0, 0.5]}
+        n_selected_indicator['data'][0]['domain'] = {
+            'x': [0, 0.35], 'y': [0, 0.5]}
         domain_1 = {'x': [0.36, 0.7], 'y': [0, 0.5]}
         domain_2 = {'x': [0.71, 1], 'y': [0, 0.5]}
         if len(n_selected_indicator['data']) == 2:
-            n_selected_indicator['data'][0]['domain'] =  {'x': [0, 0.25], 'y': [0, 0.5]}
-            n_selected_indicator['data'][1]['domain'] =  {'x': [0.26, 0.5], 'y': [0, 0.5]}
+            n_selected_indicator['data'][0]['domain'] = {
+                'x': [0, 0.25], 'y': [0, 0.5]}
+            n_selected_indicator['data'][1]['domain'] = {
+                'x': [0.26, 0.5], 'y': [0, 0.5]}
             domain_1 = {'x': [0.51, 0.75], 'y': [0, 0.5]}
             domain_2 = {'x': [0.76, 1], 'y': [0, 0.5]}
 
@@ -998,6 +1041,7 @@ def build_updated_figures(
 
     return (datashader_plot, n_selected_indicator, coordinates_4326_backup, position_backup)
 
+
 def generate_covid_bar_plots(df, scale_covid, category_covid):
     """
     Build all covid bar plots for dashboard
@@ -1010,7 +1054,7 @@ def generate_covid_bar_plots(df, scale_covid, category_covid):
     """
     df = df[0]
     states = df.Province_State.unique().tolist()
-    for rem_state in ['Wuhan Evacuee','Diamond Princess','Recovered', 'Grand Princess']:
+    for rem_state in ['Wuhan Evacuee', 'Diamond Princess', 'Recovered', 'Grand Princess']:
         if rem_state in states:
             states.remove(rem_state)
 
@@ -1019,18 +1063,22 @@ def generate_covid_bar_plots(df, scale_covid, category_covid):
     for state in states:
         df_temp = df.query('Province_State == @state').reset_index(drop=True)
         if(category_covid == 0):
-            fig.add_trace(go.Scatter(x=df_temp.Last_Update, y=df_temp.Confirmed, name='Confirmed', marker=dict(color='#c724e5'), hoverinfo='text', hovertemplate='Confirmed: <b>%{text}</b><extra></extra>', text=df_temp.Confirmed), row=int(index/5) + 1, col=int(index%5)+1)
+            fig.add_trace(go.Scatter(x=df_temp.Last_Update, y=df_temp.Confirmed, name='Confirmed', marker=dict(color='#c724e5'), hoverinfo='text',
+                                     hovertemplate='Confirmed: <b>%{text}</b><extra></extra>', text=df_temp.Confirmed), row=int(index/5) + 1, col=int(index % 5)+1)
         else:
-            fig.add_trace(go.Scatter(x=df_temp.Last_Update, y=df_temp.Deaths, name='Deaths', marker=dict(color='#b7b7b7'), hoverinfo='text', hovertemplate='Deaths: <b>%{text}</b><extra></extra>', text=df_temp.Deaths), row=int(index/5) + 1, col=int(index%5)+1)
-        
-        fig.update_yaxes(rangemode='tozero',autorange=True, type=scale_covid, row=int(index/5) + 1, col=int(index%5)+1)
+            fig.add_trace(go.Scatter(x=df_temp.Last_Update, y=df_temp.Deaths, name='Deaths', marker=dict(color='#b7b7b7'), hoverinfo='text',
+                                     hovertemplate='Deaths: <b>%{text}</b><extra></extra>', text=df_temp.Deaths), row=int(index/5) + 1, col=int(index % 5)+1)
+
+        fig.update_yaxes(rangemode='tozero', autorange=True, type=scale_covid, row=int(
+            index/5) + 1, col=int(index % 5)+1)
         index += 1
     fig.update_layout(
         template=template,
-        height= row_heights[3],
+        height=row_heights[3],
         showlegend=False,
     )
     return fig
+
 
 def get_covid_bar_chart(df, scale_covid, category_covid):
     """
@@ -1044,38 +1092,40 @@ def get_covid_bar_chart(df, scale_covid, category_covid):
     """
     global cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4
 
-    if scale_covid == 'linear' and category_covid == 0: #Total Cases
+    if scale_covid == 'linear' and category_covid == 0:  # Total Cases
         if cache_fig_1 is None:
-            cache_fig_1 = generate_covid_bar_plots(df, scale_covid, category_covid)
+            cache_fig_1 = generate_covid_bar_plots(
+                df, scale_covid, category_covid)
         return cache_fig_1
-    elif scale_covid == 'linear' and category_covid == 1: #Total Deaths
+    elif scale_covid == 'linear' and category_covid == 1:  # Total Deaths
         if cache_fig_2 is None:
-            cache_fig_2 = generate_covid_bar_plots(df, scale_covid, category_covid)
+            cache_fig_2 = generate_covid_bar_plots(
+                df, scale_covid, category_covid)
         return cache_fig_2
-    elif scale_covid == 'log' and category_covid == 0: #Total Cases
+    elif scale_covid == 'log' and category_covid == 0:  # Total Cases
         if cache_fig_3 is None:
-            cache_fig_3 = generate_covid_bar_plots(df, scale_covid, category_covid)
+            cache_fig_3 = generate_covid_bar_plots(
+                df, scale_covid, category_covid)
         return cache_fig_3
     else:
         if cache_fig_4 is None:
-            cache_fig_4 = generate_covid_bar_plots(df, scale_covid, category_covid)
+            cache_fig_4 = generate_covid_bar_plots(
+                df, scale_covid, category_covid)
         return cache_fig_4
-
-    
-    
 
 
 def generate_covid_charts(client):
     @app.callback(
         [Output('covid-histogram', 'figure')],
         [Input('covid-histogram', 'selectedData'), Input('scale-covid-dropdown', 'value'),
-        Input('category-covid-dropdown', 'value')]
+         Input('category-covid-dropdown', 'value')]
     )
     def update_covid(selected_covid, scale_covid, category_covid):
         df = client.get_dataset('pd_covid')
         figure = delayed(get_covid_bar_chart)(df, scale_covid, category_covid)
         (figure_) = figure.compute()
         return [figure_]
+
 
 def register_update_plots_callback(client):
     """
@@ -1095,12 +1145,15 @@ def register_update_plots_callback(client):
     @app.callback(
         [
             Output('indicator-graph', 'figure'), Output('map-graph', 'figure'),
-            Output('map-graph', 'config'), Output('intermediate-state-value', 'children')
+            Output('map-graph',
+                   'config'), Output('intermediate-state-value', 'children')
         ],
         [
             Input('map-graph', 'relayoutData'), Input('map-graph', 'selectedData'),
-            Input('population-toggle', 'on'), Input('colorscale-dropdown-population', 'value'), 
-            Input('hospital-toggle', 'on'), Input('colorscale-dropdown-hospital', 'value'),
+            Input('population-toggle',
+                  'on'), Input('colorscale-dropdown-population', 'value'),
+            Input('hospital-toggle',
+                  'on'), Input('colorscale-dropdown-hospital', 'value'),
             Input('covid-toggle', 'on'), Input('covid_count_type', 'value'),
         ],
         [
@@ -1120,13 +1173,12 @@ def register_update_plots_callback(client):
             coordinates_4326_backup, position_backup = coordinates_backup
         else:
             coordinates_4326_backup, position_backup = None, None
-        
+
         if int(time.time() - covid_last_update_time) > 21600:
             # update covid data every six hours
             update_covid_data(client)
             covid_last_update_time = time.time()
             covid_last_update_date = datetime.datetime.today().strftime("%b-%d-%Y at %H:%M")
-
 
         t0 = time.time()
 
@@ -1136,7 +1188,7 @@ def register_update_plots_callback(client):
 
         if hospital_enabled:
             df_hospitals = client.get_dataset('pd_hospitals')
-        
+
         if covid_enabled:
             df_covid = client.get_dataset('pd_covid')
 
@@ -1154,16 +1206,18 @@ def register_update_plots_callback(client):
 
         figures = figures_d.compute()
 
-        (datashader_plot, n_selected_indicator, coordinates_4326_backup, position_backup) = figures
+        (datashader_plot, n_selected_indicator,
+         coordinates_4326_backup, position_backup) = figures
 
         print(f"Update time: {time.time() - t0}")
         return (
             n_selected_indicator, datashader_plot, {
-                'displayModeBar':True,
+                'displayModeBar': True,
                 'modeBarButtonsToRemove': ['lasso2d', 'zoomInMapbox', 'zoomOutMapbox', 'toggleHover']
-                }, 
+            },
             (coordinates_4326_backup, position_backup)
         )
+
 
 def check_dataset(dataset_url, data_path):
     if not os.path.exists(data_path):
@@ -1190,21 +1244,24 @@ def check_dataset(dataset_url, data_path):
     else:
         print(f"Found dataset at {data_path}")
 
+
 def update_covid_data(client):
     global cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4
     covid_data_path = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/%s.csv'
     acs2018_data_path = "../data/acs2018_county_population.parquet"
     print("Updating Covid data")
-    cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4 = None, None, None, None            
-    pd_covid = delayed(load_covid)(covid_data_path, acs2018_data_path).persist()
+    cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4 = None, None, None, None
+    pd_covid = delayed(load_covid)(
+        covid_data_path, acs2018_data_path).persist()
     client.unpublish_dataset('pd_covid')
     client.publish_dataset(pd_covid=pd_covid)
+
 
 def publish_dataset_to_cluster():
     census_data_url = 'https://s3.us-east-2.amazonaws.com/rapidsai-data/viz-data/census_data_minimized.parquet.tar.gz'
     census_data_path = "../data/census_data_minimized.parquet"
     check_dataset(census_data_url, census_data_path)
-    
+
     acs2018_data_path = "../data/acs2018_county_population.parquet"
 
     hospital_path = '../data/Hospitals.csv'
@@ -1220,7 +1277,8 @@ def publish_dataset_to_cluster():
         c_df_d = delayed(load_dataset)(census_data_path).persist()
         # pandas DataFrame
         # pd_df_d = delayed(c_df_d.to_pandas)().persist()
-        pd_covid = delayed(load_covid)(covid_data_path, acs2018_data_path).persist()
+        pd_covid = delayed(load_covid)(
+            covid_data_path, acs2018_data_path).persist()
         pd_hospitals = delayed(load_hospitals)(hospital_path).persist()
 
         # Unpublish datasets if present
@@ -1255,4 +1313,5 @@ if __name__ == '__main__':
     publish_dataset_to_cluster()
 
     # Launch dashboard
-    app.run_server(debug=False, dev_tools_silence_routes_logging=True, host='0.0.0.0')
+    app.run_server(
+        debug=False, dev_tools_silence_routes_logging=True, host='0.0.0.0')
