@@ -422,18 +422,6 @@
     line-height: 2.6rem;
   }
   
-  /* Customize Loading Spinner
-  –––––––––––––––––––––––––––––––––––––––––––––––––– */
-  .dash-default-spinner {
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
-    padding: 50px;
-  }
-  
-  .dash-default-spinner > div {
-    background-color: #b0bec5 !important;
-  }
-  
   /* Special purpose buttons
   –––––––––––––––––––––––––––––––––––––––––––––––––– */
   .reset-button {

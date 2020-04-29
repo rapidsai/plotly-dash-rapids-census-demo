@@ -272,11 +272,16 @@ app.layout = html.Div(children=[
                 html.H4([
                     "Population Count",
                 ], className="container_title"),
-                dcc.Graph(
-                    id='indicator-graph',
-                    figure=blank_fig(row_heights[3]),
-                    config={'displayModeBar': False},
+                dcc.Loading(
+                    dcc.Graph(
+                        id='indicator-graph',
+                        figure=blank_fig(row_heights[3]),
+                        config={'displayModeBar': False},
+                    ),
+                    color= '#b0bec5',
+                    style={'height': f'{row_heights[3]}px'}
                 )
+
             ], style={'height': f'{row_heights[0]}px'}, className='six columns pretty_container', id="indicator-div"),
             html.Div(children=[
                 html.Div(children=[
@@ -992,6 +997,10 @@ def build_updated_figures(
     # Build indicator figure
     n_selected_indicator = {
         'data': [{
+            'domain': {
+                'x': [0, 0.5], 'y': [0, 0.5]
+            },
+            'title': {'text': 'Query Result'},
             'type': 'indicator',
             'value': len(
                 df_hists
@@ -999,7 +1008,7 @@ def build_updated_figures(
             'number': {
                 'font': {
                     'color': text_color,
-                    'size': '40px'
+                    'size': '50px'
                 },
                 "valueformat": ","
             }
@@ -1110,8 +1119,21 @@ def register_update_plots_callback(client):
                 'resetScale2d', 'hoverClosestCartesian', 'hoverCompareCartesian', 'toggleSpikelines'
             ]
         }
-
-        print(f"Update time: {time.time() - t0}")
+        compute_time = time.time() - t0
+        print(f"Update time: {compute_time}")
+        n_selected_indicator['data'].append({
+            'title': {"text": "Query Time"},
+            'type': 'indicator',
+            'value': round(compute_time, 4),
+            'domain': {'x': [0.51, 1], 'y': [0, 0.5]},
+            'number': {
+                'font': {
+                    'color': text_color,
+                    'size': '50px'
+                },
+                'suffix': "s"
+            }
+        })
         return (
             n_selected_indicator, datashader_plot, education_histogram,
             income_histogram, cow_histogram, age_histogram,
