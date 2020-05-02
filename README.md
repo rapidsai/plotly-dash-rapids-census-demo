@@ -67,13 +67,16 @@ docker run --gpus all -d -p 8050:8050 plotly_demo
 
 
 ## FAQ and Known Issues
+
 **What hardware do I need to run this locally?** To run you need an NVIDIA GPU with at least 24GB of memory, at least 32GB of system memory, and a Linux OS as defined in the [RAPIDS requirements](https://rapids.ai/start.html#req).
+
+**Important data caveaets** Geospatially filtered data will show correct distribution down to census block-group boundary levels. However, due to how the data is anonymized, tabulated, and a combination between census and ACS sources, cross filtering multiple distribution charts at once will not return meaningful results.
+
+**How did you get individual point locations?** The population density points are randomly placed within a census block and associated to match distribution counts at a census block-group level. As such, they are not actual individuals, only a statistical representation of one, and some groupings may be artificial - especially if produced from multiple cross filters. 
 
 **How are the population and distributions filtered?** Use the box select tool icon for the map or click and drag for the bar charts.
 
-**Why is the population data from 2010?** Only census data is recorded on a block level, which provides the highest resolution population distirbutions available. For more details on census boundaries refer to the [TIGERweb app](https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_apps.html). 
-
-**How did you get individual point locations?** The population density points are randomly placed within a census block and associated to match distribution counts at a census block group level. As such, they are not actual individuals, only a statistical representation of one, and some groupings may be artificial. 
+**Why is the population data from 2010?** Only census data is recorded on a block level, which provides the highest resolution population distributions available. For more details on census boundaries refer to the [TIGERweb app](https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_apps.html). 
 
 **The dashboard stop responding or the chart data disappeared!** This is likely caused by an Out of Memory Error and the application must be restarted. 
 
