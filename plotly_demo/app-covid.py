@@ -33,9 +33,7 @@ cupy.cuda.set_allocator(None)
 bgcolor = "#191a1a"  # mapbox dark map land color
 text_color = "#cfd8dc"  # Material blue-grey 100
 mapbox_land_color = "#343332"
-covid_last_update_time = time.time()
-covid_last_update_date = datetime.datetime.today().strftime("%b-%d-%Y at %H:%M")
-
+covid_data_loaded_latest_date = None
 
 command = os.popen('git log | grep Date -m 1')
 last_update = command.read()
@@ -75,6 +73,23 @@ data_center_3857, data_3857, data_4326, data_center_4326 = [], [], [], []
 coordinates_4326_backup, position_backup = None, None
 relayout_data_backup = None
 
+def get_ack_text(covid_data_loaded_latest_date):
+    global last_update
+    
+    return f'''
+    - The goal of this dashboard is to help COVID-19 decision makers. Still in active development, we are soliciting feedback from the community to help improve it.
+    - 1: US Population data is from 2010 Census and 2018 ACS, sourced with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](www.nhgis.org) ( not for redistribution )
+    - 2: Hospital data is from [HIFLD](https://hifld-geoplatform.opendata.arcgis.com/datasets/hospitals) ( Updated Oct-07-2019 ) and does not contain emergency field hospitals
+    - 3: COVID-19 data is from the [Johns Hopkins University](https://coronavirus.jhu.edu/) data on [GitHub](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) ( Updated {covid_data_loaded_latest_date} )
+    - Base map layer provided by [mapbox](https://www.mapbox.com/)
+    - Dashboard developed with Plot.ly [Dash](https://dash.plotly.com/)
+    - Geospatial point rendering developed with [Datashader](https://datashader.org/)
+    - GPU accelerated with [RAPIDS](https://rapids.ai/) [cudf](https://github.com/rapidsai/cudf) and [cupy](https://cupy.chainer.org/) libraries
+    - Cloud hosting provided by [Google](https://cloud.google.com/)
+    - For more information, reach out on this [Covid-19 Slack Channel](https://join.slack.com/t/rapids-goai/shared_invite/zt-2qmkjvzl-K3rVHb1rZYuFeczoR9e4EA)
+    - For source code, bug notes, feature requests, or to contribute, visit our [GitHub page](https://github.com/rapidsai/plotly-dash-rapids-census-demo)
+    - Dashboard last updated on: {last_update}
+    '''
 
 def load_dataset(path):
     """
@@ -127,18 +142,19 @@ def resolve_missing_counties(df, df_):
 
 def load_covid(BASE_URL, acs_path):
     '''
-        load latest covid dataset from BASE_URL, 
+        load latest covid dataset from BASE_URL,
         merge all csv files from previous dates and save a cached version
     '''
     print('loading latest covid dataset...')
     df_temp = []
     df_acs2018 = load_dataset(acs_path)
     last_n_days = (datetime.date.today() - datetime.date(2020, 3, 25)).days
-    today = (datetime.date.today() -
-             datetime.timedelta(days=1)).strftime("%m-%d-%Y")
-
+    today_dt_format = datetime.date.today() - datetime.timedelta(days=1)
+    
     if requests.get(BASE_URL % (datetime.date.today()).strftime("%m-%d-%Y")).status_code == 200:
-        today = (datetime.date.today()).strftime("%m-%d-%Y")
+        today_dt_format = datetime.date.today()
+    
+    today = today_dt_format.strftime("%m-%d-%Y")
 
     path = '../data/'+today+'.parquet'
     if not os.path.exists(path):
@@ -207,7 +223,7 @@ def load_covid(BASE_URL, acs_path):
         df_count_latest, df_count_latest_minus_1)
 
     df_county_ratio = df_count_latest.merge(df_acs2018, on='COUNTY')
-    return (df_states_last_n_days, df_count_latest, df_count_latest_minus_1, df_county_ratio)
+    return (df_states_last_n_days, df_count_latest, df_count_latest_minus_1, df_county_ratio, today_dt_format)
 
 
 def load_hospitals(path):
@@ -469,20 +485,7 @@ app.layout = html.Div(children=[
         [
             html.H4('Acknowledgments and Data Sources',
                     style={"margin-top": "0"}),
-            dcc.Markdown(f'''
-- The goal of this dashboard is to help COVID-19 decision makers. Still in active development, we are soliciting feedback from the community to help improve it.
-- 1: US Population data is from 2010 Census and 2018 ACS, sourced with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](www.nhgis.org) ( not for redistribution )
-- 2: Hospital data is from [HIFLD](https://hifld-geoplatform.opendata.arcgis.com/datasets/hospitals) ( Updated Oct-07-2019 ) and does not contain emergency field hospitals
-- 3: COVID-19 data is from the [Johns Hopkins University](https://coronavirus.jhu.edu/) data on [GitHub](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) ( Updated {covid_last_update_date} )
-- Base map layer provided by [mapbox](https://www.mapbox.com/)
-- Dashboard developed with Plot.ly [Dash](https://dash.plotly.com/)
-- Geospatial point rendering developed with [Datashader](https://datashader.org/)
-- GPU accelerated with [RAPIDS](https://rapids.ai/) [cudf](https://github.com/rapidsai/cudf) and [cupy](https://cupy.chainer.org/) libraries
-- Cloud hosting provided by [Google](https://cloud.google.com/)
-- For more information, reach out on this [Covid-19 Slack Channel](https://join.slack.com/t/rapids-goai/shared_invite/zt-2qmkjvzl-K3rVHb1rZYuFeczoR9e4EA)
-- For source code, bug notes, feature requests, or to contribute, visit our [GitHub page](https://github.com/rapidsai/plotly-dash-rapids-census-demo)
-- Dashboard last updated on: {last_update} 
-'''),
+            dcc.Markdown(children=get_ack_text(covid_data_loaded_latest_date), id='ack-text'),
         ],
         style={
             'width': '98%',
@@ -1129,6 +1132,10 @@ def generate_covid_charts(client):
         (figure_) = figure.compute()
         return [figure_]
 
+def update_latest_update_covid(pd_covid):
+    covid_data_loaded_latest_date = pd_covid[-1]
+    
+    return covid_data_loaded_latest_date
 
 def register_update_plots_callback(client):
     """
@@ -1148,8 +1155,8 @@ def register_update_plots_callback(client):
     @app.callback(
         [
             Output('indicator-graph', 'figure'), Output('map-graph', 'figure'),
-            Output('map-graph',
-                   'config'), Output('intermediate-state-value', 'children')
+            Output('map-graph','config'), Output('intermediate-state-value', 'children'),
+            Output('ack-text', 'children')
         ],
         [
             Input('map-graph', 'relayoutData'), Input('map-graph', 'selectedData'),
@@ -1170,18 +1177,19 @@ def register_update_plots_callback(client):
             covid_enabled, covid_count_type,
             coordinates_backup
     ):
-        global data_3857, data_center_3857, data_4326, data_center_4326, covid_last_update_time
+        global data_3857, data_center_3857, data_4326, data_center_4326, covid_data_loaded_latest_date
 
         if coordinates_backup is not None:
             coordinates_4326_backup, position_backup = coordinates_backup
         else:
             coordinates_4326_backup, position_backup = None, None
-
-        if int(time.time() - covid_last_update_time) > 21600:
-            # update covid data every six hours
+        
+        if covid_data_loaded_latest_date is None:
+           covid_data_loaded_latest_date = delayed(update_latest_update_covid)(client.get_dataset('pd_covid')).compute()
+        
+        # update covid data if covid_data_loaded_latest_date is not today
+        if covid_data_loaded_latest_date is not None and datetime.date.today() > covid_data_loaded_latest_date:
             update_covid_data(client)
-            covid_last_update_time = time.time()
-            covid_last_update_date = datetime.datetime.today().strftime("%b-%d-%Y at %H:%M")
 
         t0 = time.time()
 
@@ -1218,7 +1226,8 @@ def register_update_plots_callback(client):
                 'displayModeBar': True,
                 'modeBarButtonsToRemove': ['lasso2d', 'zoomInMapbox', 'zoomOutMapbox', 'toggleHover']
             },
-            (coordinates_4326_backup, position_backup)
+            (coordinates_4326_backup, position_backup),
+            get_ack_text(covid_data_loaded_latest_date)
         )
 
 
@@ -1251,13 +1260,18 @@ def check_dataset(dataset_url, data_path):
 def update_covid_data(client):
     global cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4
     covid_data_path = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/%s.csv'
-    acs2018_data_path = "../data/acs2018_county_population.parquet"
-    print("Updating Covid data")
-    cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4 = None, None, None, None
-    pd_covid = delayed(load_covid)(
-        covid_data_path, acs2018_data_path).persist()
-    client.unpublish_dataset('pd_covid')
-    client.publish_dataset(pd_covid=pd_covid)
+    todays_data_exists = (
+        requests.get(covid_data_path % (datetime.date.today()).strftime("%m-%d-%Y")).status_code == 200        
+    )
+    if todays_data_exists:
+        # check if newer dataset is available
+        acs2018_data_path = "../data/acs2018_county_population.parquet"
+        print("Updating Covid data")
+        cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4 = None, None, None, None
+        pd_covid = delayed(load_covid)(
+            covid_data_path, acs2018_data_path).persist()
+        client.unpublish_dataset('pd_covid')
+        client.publish_dataset(pd_covid=pd_covid)
 
 
 def publish_dataset_to_cluster():
@@ -1285,7 +1299,7 @@ def publish_dataset_to_cluster():
         pd_hospitals = delayed(load_hospitals)(hospital_path).persist()
 
         # Unpublish datasets if present
-        for ds_name in ['pd_df_d', 'c_df_d', 'pd_states_last_5_days', 'pd_states_today', 'pd_hospitals', 'c_acs_2018']:
+        for ds_name in ['c_df_d', 'pd_covid', 'pd_hospitals']:
             if ds_name in client.datasets:
                 client.unpublish_dataset(ds_name)
 
@@ -1296,10 +1310,6 @@ def publish_dataset_to_cluster():
         client.publish_dataset(pd_hospitals=pd_hospitals)
 
     load_and_publish_dataset()
-
-    # Precompute field bounds
-    c_df_d = client.get_dataset('c_df_d')
-
     # Register top-level callback that updates plots
     register_update_plots_callback(client)
     generate_covid_charts(client)
