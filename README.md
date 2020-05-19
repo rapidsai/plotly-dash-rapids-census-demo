@@ -2,7 +2,7 @@
 
 ![](./census-demo.png)
 
-# Installation and Run Steps [Work In Progress]
+# Installation and Run Steps
 
 ## Base Layer Setup
 The visualization uses a Mapbox base layer that requires an access token. Create one for free [here](https://www.mapbox.com/help/define-access-token/). Go to the demo root directory's `plotly_demo` folder and create a token file named `.mapbox_token`. Copy your token contents into the file. **NOTE:** Installation may fail without the token.
