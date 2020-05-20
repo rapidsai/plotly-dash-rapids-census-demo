@@ -1,11 +1,17 @@
-# Plot.ly-Dash + RAPIDS | Census 2010 Visualization
+# Plotly-Dash + RAPIDS | Census 2010 Visualization
 
 ![](./census-demo.png)
+
+# Making of the Visualization
+Find a detail walk through of how this visualization was made on our **[blog post](https://medium.com/rapids-ai/plotly-census-viz-dashboard-powered-by-rapids-1503b3506652)**.
+
 
 # Installation and Run Steps
 
 ## Base Layer Setup
-The visualization uses a Mapbox base layer that requires an access token. Create one for free [here](https://www.mapbox.com/help/define-access-token/). Go to the demo root directory's `plotly_demo` folder and create a token file named `.mapbox_token`. Copy your token contents into the file. **NOTE:** Installation may fail without the token.
+The visualization uses a Mapbox base layer that requires an access token. Create one for free [here on mapbox](https://www.mapbox.com/help/define-access-token/). Go to the demo root directory's `plotly_demo` folder and create a token file named `.mapbox_token`. Copy your token contents into the file.
+
+**NOTE:** Installation may fail without the token.
 
 ## Running the Visualization App
 
