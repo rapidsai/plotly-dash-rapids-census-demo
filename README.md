@@ -3,7 +3,7 @@
 ![](./census-demo.png)
 
 # Making of the Visualization
-Find a detail walk through of how this visualization was made on our **[blog post](https://medium.com/rapids-ai/plotly-census-viz-dashboard-powered-by-rapids-1503b3506652)**.
+Find a detailed walk-through of how this visualization was made on our **[blog post](https://medium.com/rapids-ai/plotly-census-viz-dashboard-powered-by-rapids-1503b3506652)**.
 
 
 # Installation and Run Steps
