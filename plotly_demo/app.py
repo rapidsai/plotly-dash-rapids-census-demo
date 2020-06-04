@@ -756,7 +756,7 @@ def build_datashader_plot(
 
 
 def query_df_range(df, col, x0, x1):
-    mask_ = (df[col] >= x0) & (df[col] <= x1)
+    mask_ = (df[col] >= x0) & (df[col] < x1)
     if(mask_.sum() != len(df)):
         df = df[mask_]
         df.index = cudf.core.RangeIndex(0, len(df))
