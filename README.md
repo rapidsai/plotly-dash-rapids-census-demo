@@ -26,6 +26,10 @@ For more information on how the Census and ACS data was prepared to show individ
 
 ### Conda Env
 
+Verify the following arguments in the `environment.yml` match your system(easy way to check `nvidia-smi`):
+
+cudatoolkit: Supported versions are `10.0, 10.1, 10.2`
+
 ```bash
 # setup conda environment 
 conda env create --name plotly_env --file environment.yml
