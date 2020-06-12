@@ -5,11 +5,13 @@ channels:
 dependencies:
   - python=3.7
   - plotly=4.5
-  - cudf
+  - cudf=0.13
   - dask-cuda
+  - datashader
   - dash=1.8
   - dash-bootstrap-components
   - cudatoolkit=10.2  
   - dash-daq=0.3.2
   - gunicorn=20.0
   - pyproj
+  - requests
