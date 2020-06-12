@@ -27,14 +27,12 @@ For more information on how the Census and ACS data was prepared to show individ
 ### Conda Env
 
 ```bash
-# setup directory
-cd plotly_demo
-
 # setup conda environment 
 conda env create --name plotly_env --file environment.yml
 source activate plotly_env
 
 # run and access
+cd plotly_demo
 python app.py
 ```
 
