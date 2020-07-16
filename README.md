@@ -98,4 +98,4 @@ docker run --gpus all -d -p 8050:8050 plotly_demo
 - Dashboard developed with [Plot.ly Dash](https://plotly.com/dash/)
 - Geospatial point rendering developed with [Datashader](https://datashader.org/)
 - GPU accelerated with [RAPIDS cudf](https://rapids.ai/) and [cupy](https://cupy.chainer.org/) | CPU with the [pandas](https://pandas.pydata.org/)
-- For source code and data workflow, visit our [GitHub](https://github.com/rapidsai/plotly-dash-rapids-census-demo/tree/master)
+- For source code and data workflow, visit our [GitHub](https://github.com/rapidsai/plotly-dash-rapids-census-demo/tree/main)
