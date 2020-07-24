@@ -117,7 +117,6 @@ def load_dataset(path):
         df_d['age'] = df_d.age.to_pandas().astype('category')
     return df_d
 
-
 def resolve_missing_counties(df, df_):
     '''
         making sure counties reported yesterday and today are consistent in size
@@ -138,7 +137,6 @@ def resolve_missing_counties(df, df_):
     df_ = cudf.concat([df_, df_not_in_yesterday]
                       ).sort_values('COUNTY').reset_index()
     return df, df_
-
 
 def load_covid(BASE_URL, acs_path):
     '''
@@ -202,6 +200,7 @@ def load_covid(BASE_URL, acs_path):
     }, inplace=True)
     df_states_last_n_days = df.groupby(
         ['Province_State', 'Last_Update']).sum().reset_index().to_pandas()
+    
     df_county = df.groupby(['COUNTY', 'Last_Update']).agg(
         {
             'Deaths': 'sum',
@@ -211,8 +210,7 @@ def load_covid(BASE_URL, acs_path):
     df_county = df_county.merge(df_combined_key, on='COUNTY')
     df_county.Last_Update = pd.to_datetime(df_county.Last_Update.str.split(' ')[
                                            0].to_pandas().astype('str'))
-
-    # keep separate dataframes for last 2 days
+    
     last_2_days = np.sort(df_county.Last_Update.unique().to_array())[-2:]
     df_count_latest = df_county.query(
         'Last_Update == @last_2_days[-1]').drop_duplicates('COUNTY').reset_index(drop=True)
@@ -223,6 +221,7 @@ def load_covid(BASE_URL, acs_path):
         df_count_latest, df_count_latest_minus_1)
 
     df_county_ratio = df_count_latest.merge(df_acs2018, on='COUNTY')
+
     return (df_states_last_n_days, df_count_latest, df_count_latest_minus_1, df_county_ratio, today_dt_format)
 
 
@@ -319,7 +318,7 @@ app.layout = html.Div(children=[
                 html.Div([
                     dash_dangerously_set_inner_html.DangerouslySetInnerHTML(
                         """
-                        <h4 class='container_title'>US Population (2010)<sup>1</sup> Hospital Beds (2019)<sup>2</sup> and Total COVID-19 Cases by County (Daily)<sup>3</sup> on Map</h4>
+                        <h4 class='container_title'>US Population (2010)<sup>1</sup> Standard Hospital Beds (2019)<sup>2</sup> and Total COVID-19 Cases by County (Daily)<sup>3</sup> on Map</h4>
                         """
                     ),
                 ], className="container_title"),
@@ -401,7 +400,7 @@ app.layout = html.Div(children=[
                                 id='covid_count_type',
                                 options=[
                                     {'label': 'Total Cases', 'value': 0},
-                                    {'label': 'Percentage Increase of Last 2 Days',
+                                    {'label': 'New Daily Cases',
                                         'value': 1},
                                     {'label': 'Case Per Capita by County', 'value': 2},
                                 ],
@@ -719,7 +718,7 @@ def build_datashader_plot(
                     sizemin=2,
                     color='black',
                     opacity=0.9,
-                    sizeref=120,
+                    sizeref=110,
                 ),
                 'hoverinfo': 'none'
             }
@@ -748,54 +747,68 @@ def build_datashader_plot(
         }
         )
     if df_covid is not None:
-        df_covid_yesterday = df_covid[2]
         df_covid_county_ratio = df_covid[3]
-        yesterday = df_covid_yesterday.Last_Update.to_pandas().max().strftime("%B, %d")
+        df_covid_yesterday = df_covid[2]
         df_covid = df_covid[1]
         today = df_covid.Last_Update.to_pandas().max().strftime("%B, %d")
-        size_markers = np.copy(df_covid.Confirmed.to_array())
-        size_markers_labels = np.copy(size_markers)
-        annotations = {
-            'text': size_markers_labels
-        }
-        if covid_count_type == 0:
-            size_markers[size_markers <= 2] = 2
-            factor = 'As of '+today+' <br>Cases: <b>%{text}</b> <br>'
-            sizeref = size_markers.max()/500
 
-        if covid_count_type == 1:
-            size_markers_yesterday = np.copy(
-                df_covid_yesterday.Confirmed.to_array())
-            size_markers_yesterday[size_markers_yesterday == 0] = 1
-            size_markers = (np.nan_to_num(
-                (size_markers - df_covid_yesterday.Confirmed.to_array())*100/size_markers_yesterday)).astype('int64')
+        bubble_scale = 10
+
+        if covid_count_type == 0:
+            size_markers = np.copy(df_covid.Confirmed.to_array())
+            
+            # hover formated number
             size_markers_labels = np.copy(size_markers)
-            size_markers = np.absolute(size_markers)
-            size_markers[size_markers > 1000] = 1000
+            
+            # bubble max min 
+            size_markers[size_markers <= 2] = 2
+            size_markers[size_markers > 50000] = 50000
+            
             annotations = {
-                'text': size_markers_labels,
-                'customdata': np.vstack([df_covid_yesterday.Confirmed.to_array(), df_covid.Confirmed.to_array()]).T
+                'text': size_markers_labels
             }
-            factor = 'Cases as of: <br>'+yesterday + \
-                ': <b>%{customdata[0]}</b> <br>'+today + \
-                ': %{customdata[1]} <br>Increase: <b> %{text} %</b> <br>'
-            sizeref = 15
+            factor = ' Total cases as of '+today+': <br> <b>%{text}</b> <br>'
+             # update to adjust for bubble scaling 
+            sizeref = 40 * bubble_scale
+
+        elif covid_count_type == 1:
+            size_markers_today = np.copy(df_covid.Confirmed.to_array())
+            size_markers_yesterday = np.copy(df_covid_yesterday.Confirmed.to_array())
+            size_markers = (np.nan_to_num( size_markers_today - size_markers_yesterday ))
+            size_markers = size_markers.clip(min=0)
+  
+            # hover formatted number
+            size_markers_labels = np.copy(size_markers)
+
+            # bubble max min 
+            size_markers[size_markers > 25000] = 25000       
+            annotations = {
+                'text': size_markers_labels
+            }
+            factor = ' New cases for '+today+': <br> <b>%{text}</b> <br>'
+            # update to adjust for bubble scaling 
+            sizeref = 3 * bubble_scale
 
         elif covid_count_type == 2:
             df_covid = df_covid_county_ratio
             size_markers = np.nan_to_num(df_covid.Confirmed.to_array()/(df_covid.acs2018_population.to_array()/1000)).astype('float')
+
+           # hover formated number
             size_markers_labels = np.around(size_markers, 2)
-            size_markers[size_markers > 35] = 35
+            
+            # bubble max min 
+            size_markers[size_markers <= 2] = 2
+            size_markers[size_markers > 20000] = 20000
+
             annotations = {
                 'text': size_markers_labels,
                 'customdata': df_covid.acs2018_population.to_array()
             }
-            factor = 'Population Data from 2018 ACS <br> Population: %{customdata} <br> Cases Per 1000 People: <b> %{text} </b> <br>'
-            sizeref = 0.3
+            factor = ' Population Data from 2018 ACS <br> Population: <b> %{customdata} </b> <br> Cases Per 1000 People: <b> %{text} </b> <br>'
+             # update to adjust for bubble scaling 
+            sizeref = 2
 
         marker_border = 2*sizeref
-        size_markers[size_markers >= np.percentile(
-            size_markers, 99.9)] = np.percentile(size_markers, 99.9)
 
         map_graph['data'].append(
             {
@@ -805,7 +818,7 @@ def build_datashader_plot(
                 'marker': go.scattermapbox.Marker(
                     size=size_markers + marker_border,
                     color='black',
-                    opacity=0.6,
+                    opacity=0.8,
                     sizeref=sizeref,
                 ),
                 'hoverinfo': 'none',
@@ -818,9 +831,9 @@ def build_datashader_plot(
             'lon': df_covid.Long_.to_array(),
             'marker': go.scattermapbox.Marker(
                     size=size_markers,
-                    sizemin=2,
+                    sizemin=3,
                     color='#f20e5a',
-                    opacity=0.6,
+                    opacity=0.5,
                     sizeref=sizeref,
             ),
             'hovertemplate': (
@@ -1266,7 +1279,7 @@ def update_covid_data(client):
     if todays_data_exists:
         # check if newer dataset is available
         acs2018_data_path = "../data/acs2018_county_population.parquet"
-        print("Updating Covid data")
+        print("Updating Covid data...")
         cache_fig_1, cache_fig_2, cache_fig_3, cache_fig_4 = None, None, None, None
         pd_covid = delayed(load_covid)(
             covid_data_path, acs2018_data_path).persist()
