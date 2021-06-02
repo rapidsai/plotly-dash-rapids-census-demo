@@ -380,7 +380,7 @@ app.layout = html.Div(children=[
                         id='education-histogram',
                         config={'displayModeBar': False},
                         figure=blank_fig(row_heights[2]),
-                        animate=True
+                        animate=False
                     ),
                 ],
                 style={'margin-right': '2%'}, className='six columns pretty_container', id="education-div"
@@ -400,7 +400,7 @@ app.layout = html.Div(children=[
                         id='income-histogram',
                         config={'displayModeBar': False},
                         figure=blank_fig(row_heights[2]),
-                        animate=True
+                        animate=False
                     ),
                 ],
                 className='six columns pretty_container', id="income-div"
@@ -420,7 +420,7 @@ app.layout = html.Div(children=[
                         id='cow-histogram',
                         config={'displayModeBar': False},
                         figure=blank_fig(row_heights[2]),
-                        animate=True
+                        animate=False
                     ),
                 ],
                 style={'margin-right': '2%'}, className='six columns pretty_container', id="cow-div"
@@ -440,7 +440,7 @@ app.layout = html.Div(children=[
                         id='age-histogram',
                         config={'displayModeBar': False},
                         figure=blank_fig(row_heights[2]),
-                        animate=True
+                        animate=False
                     ),
                 ],
                 className='six columns pretty_container', id="age-div"

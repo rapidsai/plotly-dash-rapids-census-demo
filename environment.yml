@@ -5,7 +5,7 @@ channels:
 dependencies:
   - python=3.7
   - plotly=4.5
-  - cudf>=0.17
+  - cudf>=0.19
   - dask-cuda
   - datashader>=0.11.1
   - dash=1.8
