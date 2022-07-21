@@ -1,27 +1,53 @@
 import cudf
-import pandas as pd
+# import pandas as pd
 import numpy as np
-import random
-import time
+# import random
+# import time
 import datetime
 import os
 import geopandas as gpd
-from shapely.geometry import Point
+# from shapely.geometry import Point
 import sys
+import cupy as cp
+import cuspatial
 
 def random_points_in_polygon(number, polygon):
-    points_x = np.array([])
-    points_y = np.array([])
     min_x, min_y, max_x, max_y = polygon.bounds
-    i= 0
-    while i < number:
-        point_x = random.uniform(min_x, max_x)
-        point_y = random.uniform(min_y, max_y)
-        if polygon.contains(Point(point_x, point_y)):
-            points_x = np.append(points_x, point_x)
-            points_y = np.append(points_y, point_y)
-            i += 1
-    return points_x, points_y # returns list of points(lat), list of points(long)
+    x,y = cp.array(polygon.exterior.coords.xy)
+    i= number
+    final_points = cudf.DataFrame({
+        "x":[],
+        "y":[]
+    })
+    while final_points.shape[0] < number:
+        points = cudf.DataFrame({
+            "x": cp.random.uniform(min_x, max_x, int(i/3)),
+            "y": cp.random.uniform(min_y, max_y, int(i/3))
+        })
+        res = cuspatial.point_in_polygon(
+            points.x.values, points.y.values,
+            cudf.Series([0], index=["selection"]),
+            [0],
+            x,
+            y,
+        )
+        final_points = cudf.concat([final_points, points[res.selection]])
+        
+    return final_points.head(number).x.values,final_points.head(number).y.values 
+
+# def random_points_in_polygon(number, polygon):
+#     points_x = np.array([])
+#     points_y = np.array([])
+#     min_x, min_y, max_x, max_y = polygon.bounds
+#     i= 0
+#     while i < number:
+#         point_x = random.uniform(min_x, max_x)
+#         point_y = random.uniform(min_y, max_y)
+#         if polygon.contains(Point(point_x, point_y)):
+#             points_x = np.append(points_x, point_x)
+#             points_y = np.append(points_y, point_y)
+#             i += 1
+#     return points_x, points_y # returns list of points(lat), list of points(long)
 
 #read block data
 df = cudf.read_csv('/home/ajay/data/census/all_us_block_level_population_census2010/nhgis0014_csv/nhgis0014_ds172_2010_block.csv', usecols=['GISJOIN', 'H7V001' ,'STATEA'])
