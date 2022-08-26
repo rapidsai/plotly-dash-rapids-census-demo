@@ -2,6 +2,16 @@
 
 ![census_2020_readme_ss](https://user-images.githubusercontent.com/35873124/186991714-b8ec76f8-47d5-4663-b484-6b5666c5126b.png)
 
+## Data-Selection Views
+The demo consists of six views and all views are calculated at a block level
+- Total Population view shows total Census 2020 population.
+- Migrating In view shows net inward decennial migration.
+- Stationary view shows population that were stationary.
+- Migrating Out view shows net outward decennial migration.
+- Net Migration view shows total decennial migration. Points are colored into three categories - migrating in, stationary, migrating out
+- Population with Race shows total Census 2020 population colored into seven race categories - White alone, African American alone, American Indian alone, Asian alone, Native Hawaiian alone, Other Race alone, Two or More races.
+
+
 # Installation and Run Steps
 
 ## Base Layer Setup
