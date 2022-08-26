@@ -1,5 +1,0 @@
-plotly=4.5
-dash=1.8
-dash-daq=0.3.2
-dash-bootstrap-components
-gunicorn=20.0
