@@ -1,5 +1,9 @@
 # Plot.ly Dash + RAPIDS | Census 2010 | COVID-19 Visualization
 
+```diff
+- Depreciated and no longer updated -
+```
+
 ![screenshot](./RAPIDS-plotly%20Census-CV19.png)
 
 # Overview
