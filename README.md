@@ -48,7 +48,8 @@ source activate plotly_env
 
 # run and access
 cd plotly_demo
-python app.py
+jupyter lab
+run `census_total_population_demo.ipynb` notebook
 ```
 ## Dependencies
 
