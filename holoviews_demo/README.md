@@ -2,6 +2,14 @@
 
 ![hvr1](https://user-images.githubusercontent.com/35873124/189291984-d95ddf27-9ec8-452a-b596-05398ce47969.png)
 
+## Charts
+1) Map chart shows the total migration points for selected view
+2) Top counties bar show the counties with most migration for selected view
+3) Net Race migration bar shows total inward and outward migartion for selected view
+4) Population Distribution shows to distribution of migration across blocks for selected view
+
+Cross-filtering is enabled to link all the four charts using box-select tool
+
 ## Race Views
 The demo consists of eight views ( seven race views + one all-race view)
 
