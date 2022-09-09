@@ -1,6 +1,14 @@
 # Plotly-Dash + RAPIDS | Census 2020 Visualization
 
-![census_2020_readme_ss](https://user-images.githubusercontent.com/35873124/186991714-b8ec76f8-47d5-4663-b484-6b5666c5126b.png)
+![pr1](https://user-images.githubusercontent.com/35873124/189301695-328af0cc-1878-408d-ba01-bdbc61550628.png)
+
+## Charts
+1) Map chart shows the total population points for chosen view and selected area
+2) Top counties bar show the top 15 counties for chosen view and selected area
+3) Bottom counties bar show the bottom 15 counties for chosen view and selected area
+4) Race Distribution shows distribution of individual races across blocks for chosen view and selected area
+
+Cross-filtering is enabled to link all the four charts using box-select tool
 
 ## Data-Selection Views
 The demo consists of six views and all views are calculated at a block level
