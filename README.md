@@ -23,7 +23,7 @@ The visualization uses a Mapbox base layer that requires an access token. Create
 ## Data 
 There is 1 main dataset:
 
-- 2020 Census for Total Population with Migration from 2010 Census
+- Total Population Dataset ; Consists of Census 2020 total population with decennial migration from Census 2010 at a block level.
 
 For more information on how the Census 2020 and 2010 Migration data was prepared to show individual points, refer to the `/data_prep_total_population` folder.
 
@@ -82,4 +82,4 @@ python app.py
 - Dashboard developed with [Plotly Dash](https://plotly.com/dash/).
 - Geospatial point rendering developed with [Datashader](https://datashader.org/).
 - GPU toggle accelerated with [RAPIDS cudf](https://rapids.ai/) and [cupy](https://cupy.chainer.org/), CPU toggle with [pandas](https://pandas.pydata.org/).
-- For source code and data workflow, visit our [GitHub](https://github.com/NishantJadhav369/plotly-dash-rapids-census-demo/tree/census-2020).
+- For source code and data workflow, visit our [GitHub](https://github.com/rapidsai/plotly-dash-rapids-census-demo/tree/census-2020).
