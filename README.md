@@ -3,15 +3,18 @@
 ![pr1](https://user-images.githubusercontent.com/35873124/189301695-328af0cc-1878-408d-ba01-bdbc61550628.png)
 
 ## Charts
-1) Map chart shows the total population points for chosen view and selected area
-2) Top counties bar show the top 15 counties for chosen view and selected area
-3) Bottom counties bar show the bottom 15 counties for chosen view and selected area
-4) Race Distribution shows distribution of individual races across blocks for chosen view and selected area
+
+1. Map chart shows the total population points for chosen view and selected area
+2. Top counties bar show the top 15 counties for chosen view and selected area
+3. Bottom counties bar show the bottom 15 counties for chosen view and selected area
+4. Race Distribution shows distribution of individual races across blocks for chosen view and selected area
 
 Cross-filtering is enabled to link all the four charts using box-select tool
 
 ## Data-Selection Views
+
 The demo consists of six views and all views are calculated at a block level
+
 - Total Population view shows total Census 2020 population.
 - Migrating In view shows net inward decennial migration.
 - Stationary view shows population that were stationary.
@@ -19,16 +22,16 @@ The demo consists of six views and all views are calculated at a block level
 - Net Migration view shows total decennial migration. Points are colored into three categories - migrating in, stationary, migrating out
 - Population with Race shows total Census 2020 population colored into seven race categories - White alone, African American alone, American Indian alone, Asian alone, Native Hawaiian alone, Other Race alone, Two or More races.
 
-
 # Installation and Run Steps
 
 ## Base Layer Setup
+
 The visualization uses a Mapbox base layer that requires an access token. Create one for free [here on mapbox](https://www.mapbox.com/help/define-access-token/). Go to the demo root directory's `plotly_demo` folder and create a token file named `.mapbox_token`. Copy your token contents into the file.
 
 **NOTE:** Installation may fail without the token.
 
+## Data
 
-## Data 
 There is 1 main dataset:
 
 - Total Population Dataset ; Consists of Census 2020 total population with decennial migration from Census 2010 at a block level.
@@ -39,18 +42,22 @@ For more information on how the Census 2020 and 2010 Migration data was prepared
 
 Verify the following arguments in the `environment.yml` match your system(easy way to check `nvidia-smi`):
 
-cudatoolkit:  Version used is `11.5`
+cudatoolkit: Version used is `11.5`
 
 ```bash
-# setup conda environment 
+# setup conda environment
 conda env create --name plotly_env --file environment.yml
 source activate plotly_env
 
-# run and access
+# run and access single GPU version
 cd plotly_demo
-jupyter lab
-run `census_total_population_demo.ipynb` notebook
+python app.py
+
+# run and access multi GPU version
+cd plotly_demo
+python dask_app.py
 ```
+
 ## Dependencies
 
 - python=3.9
@@ -77,12 +84,11 @@ run `census_total_population_demo.ipynb` notebook
 
 **How are the population and distributions filtered?** Use the box select tool icon for the map or click and drag for the bar charts.
 
-**Why is the population data from 2010 and 2020?** Only census data is recorded on a block level, which provides the highest resolution population distributions available. For more details on census boundaries refer to the [TIGERweb app](https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_apps.html). 
+**Why is the population data from 2010 and 2020?** Only census data is recorded on a block level, which provides the highest resolution population distributions available. For more details on census boundaries refer to the [TIGERweb app](https://tigerweb.geo.census.gov/tigerwebmain/TIGERweb_apps.html).
 
-**The dashboard stop responding or the chart data disappeared!** This is likely caused by an Out of Memory Error and the application must be restarted. 
+**The dashboard stop responding or the chart data disappeared!** This is likely caused by an Out of Memory Error and the application must be restarted.
 
-**How do I request a feature or report a bug?** Create an [Issue](https://github.com/rapidsai/plotly-dash-rapids-census-demo/issues) and we will get to it asap. 
-
+**How do I request a feature or report a bug?** Create an [Issue](https://github.com/rapidsai/plotly-dash-rapids-census-demo/issues) and we will get to it asap.
 
 ## Acknowledgments and Data Sources
 
