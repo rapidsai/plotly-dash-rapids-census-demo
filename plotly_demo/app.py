@@ -479,8 +479,7 @@ def query_df_selected_ids(df, col, selected_ids):
     # print(col,selected_ids)
     if (col == "county_top") | (col == "county_bottom"):
         col = "county"
-    queried_df = df[df[col].isin(selected_ids)]
-    return queried_df
+    return df[df[col].isin(selected_ids)]
 
 
 def no_data_figure():
@@ -499,12 +498,6 @@ def no_data_figure():
             "yaxis": {"visible": False},
         },
     }
-
-
-df["race"].value_counts()
-
-
-df.groupby("race")["net"].count()
 
 
 def build_histogram_default_bins(
@@ -627,9 +620,9 @@ def build_updated_figures(
     df,
     relayout_data,
     selected_map,
-    # selected_race,
-    # selected_county_top,
-    # selected_county_bottom,
+    selected_race,
+    selected_county_top,
+    selected_county_bottom,
     colorscale_name,
     data_3857,
     data_center_3857,
@@ -644,14 +637,14 @@ def build_updated_figures(
     colorscale_transform = "linear"
     selected = {}
 
-    # selected = {
-    #     col: bar_selected_ids(sel, col)
-    #     for col, sel in zip(
-    #         ["race", "county_top", "county_bottom"],
-    #         [selected_race, selected_county_top, selected_county_bottom],
-    #     )
-    #     if sel and sel.get("points", [])
-    # }
+    selected = {
+        col: bar_selected_ids(sel, col)
+        for col, sel in zip(
+            ["race", "county_top", "county_bottom"],
+            [selected_race, selected_county_top, selected_county_bottom],
+        )
+        if sel and sel.get("points", [])
+    }
 
     if relayout_data is not None:
         transformer_4326_to_3857 = Transformer.from_crs(
@@ -735,27 +728,27 @@ def build_updated_figures(
     # Select points as per view
 
     if (view_name == "total") | (view_name == "race"):
-        df_hists = df[(df["net"] == 0) | (df["net"] == 1)]
-        df_hists["net"] = df_hists["net"].astype("int8")
-        # df_hists['race'] = df_hists['race'].astype('category')
+        df = df[(df["net"] == 0) | (df["net"] == 1)]
+        df["net"] = df["net"].astype("int8")
+        # df['race'] = df['race'].astype('category')
     elif view_name == "in":
-        df_hists = df[df["net"] == 1]
-        df_hists["net"] = df_hists["net"].astype("int8")
+        df = df[df["net"] == 1]
+        df["net"] = df["net"].astype("int8")
     elif view_name == "stationary":
-        df_hists = df[df["net"] == 0]
-        df_hists["net"] = df_hists["net"].astype("int8")
+        df = df[df["net"] == 0]
+        df["net"] = df["net"].astype("int8")
     elif view_name == "out":
-        df_hists = df[df["net"] == -1]
-        df_hists["net"] = df_hists["net"].astype("int8")
+        df = df[df["net"] == -1]
+        df["net"] = df["net"].astype("int8")
     else:  # net migration condition
-        df_hists = df
-        # df_hists["net"] = df_hists["net"].astype("category")
+        df = df
+        # df["net"] = df["net"].astype("category")
 
     for col in selected:
-        df_hists = query_df_selected_ids(df_hists, col, selected[col])
+        df = query_df_selected_ids(df, col, selected[col])
 
     datashader_plot = build_datashader_plot(
-        df_hists,
+        df,
         colorscale_name,
         colorscale_transform,
         new_coordinates,
@@ -772,7 +765,7 @@ def build_updated_figures(
                 "domain": {"x": [0.31, 0.41], "y": [0, 0.5]},
                 "title": {"text": "Query Result"},
                 "type": "indicator",
-                "value": len(df_hists),
+                "value": len(df),
                 "number": {
                     "font": {"color": text_color, "size": "50px"},
                     "valueformat": ",",
@@ -800,51 +793,52 @@ def build_updated_figures(
 
     # print("DATASHADER done")
 
-    # race_histogram = build_histogram_default_bins(
-    #     df_hists,
-    #     "race",
-    #     selected,
-    #     "v",
-    #     colorscale_name,
-    #     colorscale_transform,
-    #     view_name,
-    #     flag="All",
-    # )
+    race_histogram = build_histogram_default_bins(
+        df,
+        "race",
+        selected,
+        "v",
+        colorscale_name,
+        colorscale_transform,
+        view_name,
+        flag="All",
+    )
 
     # # print("RACE done")
 
     # # print("INSIDE UPDATE")
-    # county_top_histogram = build_histogram_default_bins(
-    #     df_hists,
-    #     "county",
-    #     selected,
-    #     "v",
-    #     colorscale_name,
-    #     colorscale_transform,
-    #     view_name,
-    #     flag="top",
-    # )
+    county_top_histogram = build_histogram_default_bins(
+        df,
+        "county",
+        selected,
+        "v",
+        colorscale_name,
+        colorscale_transform,
+        view_name,
+        flag="top",
+    )
 
     # # print("COUNTY TOP done")
 
-    # county_bottom_histogram = build_histogram_default_bins(
-    #     df_hists,
-    #     "county",
-    #     selected,
-    #     "v",
-    #     colorscale_name,
-    #     colorscale_transform,
-    #     view_name,
-    #     flag="bottom",
-    # )
+    county_bottom_histogram = build_histogram_default_bins(
+        df,
+        "county",
+        selected,
+        "v",
+        colorscale_name,
+        colorscale_transform,
+        view_name,
+        flag="bottom",
+    )
 
     # print("COUNTY BOTTOM done")
 
+    del (df)
     return (
         datashader_plot,
-        # county_top_histogram,
-        # county_bottom_histogram,
-        # race_histogram,
+        county_top_histogram,
+        county_bottom_histogram,
+        race_histogram,
         n_selected_indicator,
         coordinates_4326_backup,
         position_backup,
@@ -1214,20 +1208,20 @@ def clear_county_hist_bottom_selections(*args):
         Output("indicator-graph", "figure"),
         Output("map-graph", "figure"),
         Output("map-graph", "config"),
-        # Output("county-histogram-top", "figure"),
-        # Output("county-histogram-top", "config"),
-        # Output("county-histogram-bottom", "figure"),
-        # Output("county-histogram-bottom", "config"),
-        # Output("race-histogram", "figure"),
-        # Output("race-histogram", "config"),
+        Output("county-histogram-top", "figure"),
+        Output("county-histogram-top", "config"),
+        Output("county-histogram-bottom", "figure"),
+        Output("county-histogram-bottom", "config"),
+        Output("race-histogram", "figure"),
+        Output("race-histogram", "config"),
         Output("intermediate-state-value", "children"),
     ],
     [
         Input("map-graph", "relayoutData"),
         Input("map-graph", "selectedData"),
-        # Input("race-histogram", "selectedData"),
-        # Input("county-histogram-top", "selectedData"),
-        # Input("county-histogram-bottom", "selectedData"),
+        Input("race-histogram", "selectedData"),
+        Input("county-histogram-top", "selectedData"),
+        Input("county-histogram-bottom", "selectedData"),
         Input("view-dropdown", "value"),
         Input("gpu-toggle", "on"),
     ],
@@ -1236,9 +1230,9 @@ def clear_county_hist_bottom_selections(*args):
 def update_plots(
     relayout_data,
     selected_map,
-    # selected_race,
-    # selected_county_top,
-    # selected_county_bottom,
+    selected_race,
+    selected_county_top,
+    selected_county_bottom,
     view_name,
     gpu_enabled,
     coordinates_backup,
@@ -1274,9 +1268,9 @@ def update_plots(
         df,
         relayout_data,
         selected_map,
-        # selected_race,
-        # selected_county_top,
-        # selected_county_bottom,
+        selected_race,
+        selected_county_top,
+        selected_county_bottom,
         colorscale_name,
         data_3857,
         data_center_3857,
@@ -1291,9 +1285,9 @@ def update_plots(
 
     (
         datashader_plot,
-        # race_histogram,
-        # county_top_histogram,
-        # county_bottom_histogram,
+        race_histogram,
+        county_top_histogram,
+        county_bottom_histogram,
         n_selected_indicator,
         coordinates_4326_backup,
         position_backup,
@@ -1343,12 +1337,12 @@ def update_plots(
                 "toggleHover",
             ],
         },
-        # race_histogram,
-        # barchart_config,
-        # county_top_histogram,
-        # barchart_config,
-        # county_bottom_histogram,
-        # barchart_config,
+        race_histogram,
+        barchart_config,
+        county_top_histogram,
+        barchart_config,
+        county_bottom_histogram,
+        barchart_config,
         (coordinates_4326_backup, position_backup),
     )
 
