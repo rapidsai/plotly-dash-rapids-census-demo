@@ -1,8 +1,11 @@
 import os
-import pandas as pd, numpy as np
-import cudf, cupy
+import pandas as pd
+import numpy as np
+import cudf
+import cupy
 from dash import Dash, dcc, html
-import numpy as np, pandas as pd
+import numpy as np
+import pandas as pd
 from dash.dependencies import Input, Output, State
 import datashader.transfer_functions as tf
 import datashader as ds
@@ -14,7 +17,15 @@ import pickle
 from bokeh import palettes
 import dash
 from pyproj import Transformer
+import dask_cudf
 
+# from dask.distributed import Client, wait
+# from dask_cuda import LocalCUDACluster
+# client = Client(LocalCUDACluster())
+
+df = cudf.read_parquet(
+    "./data/total_population_dataset.parquet", columns=["easting", "northing", "race", "net", "county"]
+)
 
 # ### Dashboards start here
 
@@ -41,7 +52,6 @@ template = {
 # Colors for categories
 colors = {}
 colors["race"] = [
-    "red",
     "aqua",
     "lime",
     "yellow",
@@ -51,7 +61,6 @@ colors["race"] = [
     "saddlebrown",
 ]
 race2color = {
-    "All": "red",
     "White": "aqua",
     "African American": "lime",
     "American Indian": "yellow",
@@ -64,7 +73,22 @@ colors["net"] = [
     palettes.RdPu9[2],
     palettes.Greens9[4],
     palettes.PuBu9[2],
-]  #'#32CD32'
+]  # '#32CD32'
+
+id2county = pickle.load(open("./id2county.pkl", "rb"))
+county2id = {v: k for k, v in id2county.items()}
+id2race = {
+    0: "All",
+    1: "White",
+    2: "African American",
+    3: "American Indian",
+    4: "Asian alone",
+    5: "Native Hawaiian",
+    6: "Other Race alone",
+    7: "Two or More",
+}
+race2id = {v: k for k, v in id2race.items()}
+
 DATA_SIZE = len(df)
 
 mappings = {}
@@ -187,7 +211,7 @@ def build_datashader_plot(
 
     if view_name == "race":
         aggregate_column = "race"
-        aggregate = "count_cat"
+        aggregate = "mean"
     elif view_name == "total":
         aggregate_column = "net"
         aggregate = "count"
@@ -206,30 +230,26 @@ def build_datashader_plot(
         colorscale_name = "RdPu9"
     else:  # net
         aggregate_column = "net"
-        aggregate = "count_cat"
+        aggregate = "mean"
 
-    if aggregate == "count_cat":
-        datashader_color_scale["color_key"] = colors[aggregate_column]
+    if aggregate == "mean":
+        datashader_color_scale["cmap"] = colors[aggregate_column]
+        datashader_color_scale["how"] = "linear"
+        datashader_color_scale["span"] = (
+            df[aggregate_column].min(), df[aggregate_column].max())
     else:
         datashader_color_scale["cmap"] = [
             i[1]
             for i in build_colorscale(colorscale_name, colorscale_transform)
         ]
+        datashader_color_scale["how"] = "log"
 
-    # if isinstance(df, cudf.DataFrame):
-    #     agg = cvs.points(df.to_pandas(), x='easting', y='northing', agg=getattr(ds,aggregate)(aggregate_column))
-    #     # agg = cvs.points(df, x='easting', y='northing', agg=getattr(ds,aggregate)(aggregate_column))
-    # else:
     agg = cvs.points(
         df,
         x="easting",
         y="northing",
         agg=getattr(ds, aggregate)(aggregate_column),
     )
-
-    # agg = cvs.points(
-    #     df, x='easting', y='northing', agg=getattr(ds,aggregate)(aggregate_column) #, agg=getattr(ds, aggregate)(aggregate_column) # to pandas for dynspread
-    # )
 
     cmin = cupy.asnumpy(agg.min().data)
     cmax = cupy.asnumpy(agg.max().data)
@@ -250,7 +270,6 @@ def build_datashader_plot(
 
         img = tf.shade(
             tf.dynspread(agg, threshold=0.7),
-            how="log",
             **datashader_color_scale,
         ).to_pil()
         # img = tf.shade(agg,how='log',**datashader_color_scale).to_pil()
@@ -307,7 +326,7 @@ def build_datashader_plot(
         },
     }
 
-    if aggregate == "count_cat":
+    if aggregate == "mean":
         # for `Age By PurBlue` category
         if view_name == "race":
             colorscale = [0, 1]
@@ -343,20 +362,20 @@ def build_datashader_plot(
                 },
                 # colorscale=[(1, colors['race'][1]),(2, colors['race'][2]), (3, colors['race'][3]),(4, colors['race'][4]), (5, colors['race'][5]),(6, colors['race'][6]),(7, colors['race'][7])],
                 colorscale=[
-                    (0 / 7, colors["race"][1]),
+                    (0 / 7, colors["race"][0]),
+                    (1 / 7, colors["race"][0]),
                     (1 / 7, colors["race"][1]),
-                    (1 / 7, colors["race"][2]),
+                    (2 / 7, colors["race"][1]),
                     (2 / 7, colors["race"][2]),
-                    (2 / 7, colors["race"][3]),
+                    (3 / 7, colors["race"][2]),
                     (3 / 7, colors["race"][3]),
-                    (3 / 7, colors["race"][4]),
+                    (4 / 7, colors["race"][3]),
                     (4 / 7, colors["race"][4]),
-                    (4 / 7, colors["race"][5]),
+                    (5 / 7, colors["race"][4]),
                     (5 / 7, colors["race"][5]),
-                    (5 / 7, colors["race"][6]),
+                    (6 / 7, colors["race"][5]),
                     (6 / 7, colors["race"][6]),
-                    (6 / 7, colors["race"][7]),
-                    (7 / 7, colors["race"][7]),
+                    (7 / 7, colors["race"][6]),
                 ],
                 cmin=0,
                 cmax=1,
@@ -608,9 +627,9 @@ def build_updated_figures(
     df,
     relayout_data,
     selected_map,
-    selected_race,
-    selected_county_top,
-    selected_county_bottom,
+    # selected_race,
+    # selected_county_top,
+    # selected_county_bottom,
     colorscale_name,
     data_3857,
     data_center_3857,
@@ -625,14 +644,14 @@ def build_updated_figures(
     colorscale_transform = "linear"
     selected = {}
 
-    selected = {
-        col: bar_selected_ids(sel, col)
-        for col, sel in zip(
-            ["race", "county_top", "county_bottom"],
-            [selected_race, selected_county_top, selected_county_bottom],
-        )
-        if sel and sel.get("points", [])
-    }
+    # selected = {
+    #     col: bar_selected_ids(sel, col)
+    #     for col, sel in zip(
+    #         ["race", "county_top", "county_bottom"],
+    #         [selected_race, selected_county_top, selected_county_bottom],
+    #     )
+    #     if sel and sel.get("points", [])
+    # }
 
     if relayout_data is not None:
         transformer_4326_to_3857 = Transformer.from_crs(
@@ -730,7 +749,7 @@ def build_updated_figures(
         df_hists["net"] = df_hists["net"].astype("int8")
     else:  # net migration condition
         df_hists = df
-        df_hists["net"] = df_hists["net"].astype("category")
+        # df_hists["net"] = df_hists["net"].astype("category")
 
     for col in selected:
         df_hists = query_df_selected_ids(df_hists, col, selected[col])
@@ -781,51 +800,51 @@ def build_updated_figures(
 
     # print("DATASHADER done")
 
-    race_histogram = build_histogram_default_bins(
-        df_hists,
-        "race",
-        selected,
-        "v",
-        colorscale_name,
-        colorscale_transform,
-        view_name,
-        flag="All",
-    )
+    # race_histogram = build_histogram_default_bins(
+    #     df_hists,
+    #     "race",
+    #     selected,
+    #     "v",
+    #     colorscale_name,
+    #     colorscale_transform,
+    #     view_name,
+    #     flag="All",
+    # )
 
-    # print("RACE done")
+    # # print("RACE done")
 
-    # print("INSIDE UPDATE")
-    county_top_histogram = build_histogram_default_bins(
-        df_hists,
-        "county",
-        selected,
-        "v",
-        colorscale_name,
-        colorscale_transform,
-        view_name,
-        flag="top",
-    )
+    # # print("INSIDE UPDATE")
+    # county_top_histogram = build_histogram_default_bins(
+    #     df_hists,
+    #     "county",
+    #     selected,
+    #     "v",
+    #     colorscale_name,
+    #     colorscale_transform,
+    #     view_name,
+    #     flag="top",
+    # )
 
-    # print("COUNTY TOP done")
+    # # print("COUNTY TOP done")
 
-    county_bottom_histogram = build_histogram_default_bins(
-        df_hists,
-        "county",
-        selected,
-        "v",
-        colorscale_name,
-        colorscale_transform,
-        view_name,
-        flag="bottom",
-    )
+    # county_bottom_histogram = build_histogram_default_bins(
+    #     df_hists,
+    #     "county",
+    #     selected,
+    #     "v",
+    #     colorscale_name,
+    #     colorscale_transform,
+    #     view_name,
+    #     flag="bottom",
+    # )
 
     # print("COUNTY BOTTOM done")
 
     return (
         datashader_plot,
-        county_top_histogram,
-        county_bottom_histogram,
-        race_histogram,
+        # county_top_histogram,
+        # county_bottom_histogram,
+        # race_histogram,
         n_selected_indicator,
         coordinates_4326_backup,
         position_backup,
@@ -1148,6 +1167,8 @@ app.layout = html.Div(
 )
 
 # Clear/reset button callbacks
+
+
 @app.callback(
     Output("map-graph", "selectedData"),
     [Input("reset-map", "n_clicks"), Input("clear-all", "n_clicks")],
@@ -1180,204 +1201,161 @@ def clear_county_hist_bottom_selections(*args):
     return None
 
 
-# Query string helpers
+# # Query string helpers
 
-def register_update_plots_callback(client):
-    """
-    Register Dash callback that updates all plots in response to selection events
-    Args:
-        df_d: Dask.delayed pandas or cudf DataFrame
-    """
-    @app.callback(
-        [
-            Output("indicator-graph", "figure"),
-            Output("map-graph", "figure"),
-            Output("map-graph", "config"),
-            Output("county-histogram-top", "figure"),
-            Output("county-histogram-top", "config"),
-            Output("county-histogram-bottom", "figure"),
-            Output("county-histogram-bottom", "config"),
-            Output("race-histogram", "figure"),
-            Output("race-histogram", "config"),
-            Output("intermediate-state-value", "children"),
-        ],
-        [
-            Input("map-graph", "relayoutData"),
-            Input("map-graph", "selectedData"),
-            Input("race-histogram", "selectedData"),
-            Input("county-histogram-top", "selectedData"),
-            Input("county-histogram-bottom", "selectedData"),
-            Input("view-dropdown", "value"),
-            Input("gpu-toggle", "on"),
-        ],
-        [State("intermediate-state-value", "children")],
-    )
-    def update_plots(
+# def register_update_plots_callback(client):
+#     """
+#     Register Dash callback that updates all plots in response to selection events
+#     Args:
+#         df_d: Dask.delayed pandas or cudf DataFrame
+#     """
+@app.callback(
+    [
+        Output("indicator-graph", "figure"),
+        Output("map-graph", "figure"),
+        Output("map-graph", "config"),
+        # Output("county-histogram-top", "figure"),
+        # Output("county-histogram-top", "config"),
+        # Output("county-histogram-bottom", "figure"),
+        # Output("county-histogram-bottom", "config"),
+        # Output("race-histogram", "figure"),
+        # Output("race-histogram", "config"),
+        Output("intermediate-state-value", "children"),
+    ],
+    [
+        Input("map-graph", "relayoutData"),
+        Input("map-graph", "selectedData"),
+        # Input("race-histogram", "selectedData"),
+        # Input("county-histogram-top", "selectedData"),
+        # Input("county-histogram-bottom", "selectedData"),
+        Input("view-dropdown", "value"),
+        Input("gpu-toggle", "on"),
+    ],
+    [State("intermediate-state-value", "children")],
+)
+def update_plots(
+    relayout_data,
+    selected_map,
+    # selected_race,
+    # selected_county_top,
+    # selected_county_bottom,
+    view_name,
+    gpu_enabled,
+    coordinates_backup,
+):
+    global df, data_3857, data_center_3857, data_4326, data_center_4326
+
+    t0 = time.time()
+
+    if coordinates_backup is not None:
+        coordinates_4326_backup, position_backup = coordinates_backup
+    else:
+        coordinates_4326_backup, position_backup = None, None
+
+    # print(df)
+
+    if gpu_enabled:
+        if isinstance(df, pd.DataFrame):
+            df = cudf.from_pandas(df)
+    else:
+        if isinstance(df, cudf.DataFrame):
+            df = df.to_pandas()
+
+    colorscale_name = "Viridis"
+
+    (
+        data_3857,
+        data_center_3857,
+        data_4326,
+        data_center_4326,
+    ) = set_projection_bounds(df)
+
+    figures = build_updated_figures(
+        df,
         relayout_data,
         selected_map,
-        selected_race,
-        selected_county_top,
-        selected_county_bottom,
+        # selected_race,
+        # selected_county_top,
+        # selected_county_bottom,
+        colorscale_name,
+        data_3857,
+        data_center_3857,
+        data_4326,
+        data_center_4326,
+        coordinates_4326_backup,
+        position_backup,
         view_name,
-        gpu_enabled,
-        coordinates_backup,
-    ):
-        global df, data_3857, data_center_3857, data_4326, data_center_4326
+    )
 
-        t0 = time.time()
+    # figures = figures_d.compute()
 
-        if coordinates_backup is not None:
-            coordinates_4326_backup, position_backup = coordinates_backup
-        else:
-            coordinates_4326_backup, position_backup = None, None
+    (
+        datashader_plot,
+        # race_histogram,
+        # county_top_histogram,
+        # county_bottom_histogram,
+        n_selected_indicator,
+        coordinates_4326_backup,
+        position_backup,
+    ) = figures
 
-        # print(df)
-
-        if gpu_enabled:
-            if isinstance(df, pd.DataFrame):
-                df = cudf.from_pandas(df)
-        else:
-            if isinstance(df, cudf.DataFrame):
-                df = df.to_pandas()
-
-        colorscale_name = "Viridis"
-
-        (
-            data_3857,
-            data_center_3857,
-            data_4326,
-            data_center_4326,
-        ) = set_projection_bounds(df)
-
-        figures = build_updated_figures(
-            df,
-            relayout_data,
-            selected_map,
-            selected_race,
-            selected_county_top,
-            selected_county_bottom,
-            colorscale_name,
-            data_3857,
-            data_center_3857,
-            data_4326,
-            data_center_4326,
-            coordinates_4326_backup,
-            position_backup,
-            view_name,
-        )
-
-        # figures = figures_d.compute()
-
-        (
-            datashader_plot,
-            race_histogram,
-            county_top_histogram,
-            county_bottom_histogram,
-            n_selected_indicator,
-            coordinates_4326_backup,
-            position_backup,
-        ) = figures
-
-        barchart_config = {
+    barchart_config = {
+        "displayModeBar": True,
+        "modeBarButtonsToRemove": [
+            "zoom2d",
+            "pan2d",
+            "select2d",
+            "lasso2d",
+            "zoomIn2d",
+            "zoomOut2d",
+            "resetScale2d",
+            "hoverClosestCartesian",
+            "hoverCompareCartesian",
+            "toggleSpikelines",
+        ],
+    }
+    compute_time = time.time() - t0
+    # print(f"Update time: {compute_time}")
+    n_selected_indicator["data"].append(
+        {
+            "title": {"text": "Query Time"},
+            "type": "indicator",
+            "value": round(compute_time, 4),
+            "domain": {"x": [0.53, 0.61], "y": [0, 0.5]},
+            "number": {
+                "font": {
+                    "color": text_color,
+                    "size": "50px",
+                },
+                "suffix": " seconds",
+            },
+        }
+    )
+    return (
+        n_selected_indicator,
+        datashader_plot,
+        {
             "displayModeBar": True,
             "modeBarButtonsToRemove": [
-                "zoom2d",
-                "pan2d",
-                "select2d",
                 "lasso2d",
-                "zoomIn2d",
-                "zoomOut2d",
-                "resetScale2d",
-                "hoverClosestCartesian",
-                "hoverCompareCartesian",
-                "toggleSpikelines",
+                "zoomInMapbox",
+                "zoomOutMapbox",
+                "toggleHover",
             ],
-        }
-        compute_time = time.time() - t0
-        # print(f"Update time: {compute_time}")
-        n_selected_indicator["data"].append(
-            {
-                "title": {"text": "Query Time"},
-                "type": "indicator",
-                "value": round(compute_time, 4),
-                "domain": {"x": [0.53, 0.61], "y": [0, 0.5]},
-                "number": {
-                    "font": {
-                        "color": text_color,
-                        "size": "50px",
-                    },
-                    "suffix": " seconds",
-                },
-            }
-        )
-        return (
-            n_selected_indicator,
-            datashader_plot,
-            {
-                "displayModeBar": True,
-                "modeBarButtonsToRemove": [
-                    "lasso2d",
-                    "zoomInMapbox",
-                    "zoomOutMapbox",
-                    "toggleHover",
-                ],
-            },
-            race_histogram,
-            barchart_config,
-            county_top_histogram,
-            barchart_config,
-            county_bottom_histogram,
-            barchart_config,
-            (coordinates_4326_backup, position_backup),
-        )
-
-
-def publish_dataset_to_cluster():
-    
-    census_data_url = 'https://s3.us-east-2.amazonaws.com/rapidsai-data/viz-data/census_data.parquet.tar.gz'
-    data_path = "../data/census_data.parquet"
-    check_dataset(census_data_url, data_path)
-
-    # Note: The creation of a Dask LocalCluster must happen inside the `__main__` block,
-    cluster = LocalCUDACluster(CUDA_VISIBLE_DEVICES="0")
-    client = Client(cluster)
-    print(f"Dask status: {cluster.dashboard_link}")
-
-    # Load dataset and persist dataset on cluster
-    def load_and_publish_dataset():
-        # cudf DataFrame
-        c_df_d = delayed(load_dataset)(data_path).persist()
-        # pandas DataFrame
-        pd_df_d = delayed(c_df_d.to_pandas)().persist()
-
-        # print(type(c_df_d))
-        # Unpublish datasets if present
-        for ds_name in ['pd_df_d', 'c_df_d']:
-            if ds_name in client.datasets:
-                client.unpublish_dataset(ds_name)
-
-        # Publish datasets to the cluster
-        client.publish_dataset(pd_df_d=pd_df_d)
-        client.publish_dataset(c_df_d=c_df_d)
-
-    load_and_publish_dataset()
-
-    # Precompute field bounds
-    c_df_d = client.get_dataset('c_df_d')
-
-    # Register top-level callback that updates plots
-    register_update_plots_callback(client)
-
-
-def server():
-    # gunicorn entry point when called with `gunicorn 'app:server()'`
-    publish_dataset_to_cluster()
-    return app.server
+        },
+        # race_histogram,
+        # barchart_config,
+        # county_top_histogram,
+        # barchart_config,
+        # county_bottom_histogram,
+        # barchart_config,
+        (coordinates_4326_backup, position_backup),
+    )
 
 
 if __name__ == '__main__':
     # development entry point
-    publish_dataset_to_cluster()
+    # publish_dataset_to_cluster()
 
     # Launch dashboard
     app.run_server(
