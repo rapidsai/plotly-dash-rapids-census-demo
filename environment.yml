@@ -1,18 +1,14 @@
 channels:
   - rapidsai
   - conda-forge
-  - defaults
+  - nvidia
 dependencies:
-  - python=3.7
-  - plotly=4.5
-  - cudf>=0.19
-  - cuspatial>=0.19
-  - dask-cuda
-  - datashader>=0.11.1
-  - dash=1.8
-  - dash-bootstrap-components
-  - cudatoolkit=10.2  
-  - dash-daq=0.3.2
-  - gunicorn=20.0
-  - pyproj
-  - requests
+  - python=3.9
+  - cudatoolkit=11.6
+  - rapids=22.10
+  - dash=2.5.1
+  - jupyterlab=3.4.3
+  - dash-html-components=2.0.0
+  - dash-core-components=2.0.0
+  - dash-daq=0.5.0
+  - dash-bootstrap-components=1.2.0

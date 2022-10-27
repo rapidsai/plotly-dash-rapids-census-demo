@@ -1,0 +1,10 @@
+channels:
+  - rapidsai
+  - conda-forge
+  - nvidia
+dependencies:
+  - python=3.9
+  - cudatoolkit=11.5
+  - rapids=22.08
+  - plotly=5.10.0
+  - jupyterlab=3.4.3
