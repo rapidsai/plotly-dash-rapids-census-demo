@@ -1,6 +1,21 @@
 # Plotly-Dash + RAPIDS | Census 2020 Visualization
 
-Refer to the readme in the root directory for full information. 
+There are two versions for the same application, with all the views(described below) in both, single GPU and multi-GPU versions respectively.
+
+Recommended GPU memory:
+
+1. Single GPU version: 32GB+
+2. Multi-GPU version: 2+ GPUs of 16GB+ each
+
+```bash
+# run and access single GPU version
+cd plotly_demo
+python app.py
+
+# run and access multi GPU version
+cd plotly_demo
+python dask_app.py
+```
 
 ## Snapshot Examples
 
@@ -24,22 +39,22 @@ Refer to the readme in the root directory for full information.
 
 ![netmig](https://user-images.githubusercontent.com/35873124/189298570-64640492-4413-4d0e-a2be-aa2c91df6736.png)
 
-#### Migration population to color mapping - 
+#### Migration population to color mapping -
 
-<b>Inward Migration</b>:    Purple-Blue</br>
-<b>Stationary</b>:     Greens</br>
-<b>Outward Migration</b>:     Red Purples</br>
+<b>Inward Migration</b>: Purple-Blue</br>
+<b>Stationary</b>: Greens</br>
+<b>Outward Migration</b>: Red Purples</br>
 
 ### 6) Population with Race view
 
 ![race](https://user-images.githubusercontent.com/35873124/189298602-11873dc3-89f2-4934-8208-b68e28e59d57.png)
 
-#### Race to color mapping - 
+#### Race to color mapping -
 
-<b>White</b>:    aqua</br>
-<b>African American</b>:     lime</br>
-<b>American Indian</b>:     yellow</br>
-<b>Asian</b>:     orange</br>
-<b>Native Hawaiian</b>:     blue</br>
-<b>Other Race alone</b>:     fuchsia</br>
-<b>Two or More</b>:     saddlebrown</br>
+<b>White</b>: aqua</br>
+<b>African American</b>: lime</br>
+<b>American Indian</b>: yellow</br>
+<b>Asian</b>: orange</br>
+<b>Native Hawaiian</b>: blue</br>
+<b>Other Race alone</b>: fuchsia</br>
+<b>Two or More</b>: saddlebrown</br>
