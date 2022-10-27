@@ -20,7 +20,7 @@ text_color = "#cfd8dc"  # Material blue-grey 100
 
 
 data_center_3857, data_3857, data_4326, data_center_4326 = [], [], [], []
-census_data_url = 'https://s3.us-east-2.amazonaws.com/rapidsai-data/viz-data/census_data.parquet.tar.gz'
+census_data_url = 'https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/total_population_dataset.parquet'
 data_path = "../data/total_population_dataset.parquet"
 check_dataset(census_data_url, data_path)
 df = cudf.read_parquet("../data/total_population_dataset.parquet")

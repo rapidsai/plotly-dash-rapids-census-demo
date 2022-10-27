@@ -511,7 +511,7 @@ def register_update_plots_callback(client):
 
 def publish_dataset_to_cluster():
 
-    census_data_url = 'https://s3.us-east-2.amazonaws.com/rapidsai-data/viz-data/census_data.parquet.tar.gz'
+    census_data_url = 'https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/total_population_dataset.parquet'
     data_path = "../data/total_population_dataset.parquet"
     check_dataset(census_data_url, data_path)
 
