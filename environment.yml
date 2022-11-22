@@ -5,10 +5,14 @@ channels:
 dependencies:
   - python=3.9
   - cudatoolkit=11.6
-  - rapids=22.10
+  - cudf=22.10
+  - dask-cudf=22.10
+  - dask-cuda=22.10
   - dash=2.5.1
   - jupyterlab=3.4.3
   - dash-html-components=2.0.0
   - dash-core-components=2.0.0
   - dash-daq=0.5.0
   - dash-bootstrap-components=1.2.0
+  - datashader=0.14
+  - pyproj=3.4.0
