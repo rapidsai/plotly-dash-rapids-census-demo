@@ -459,10 +459,8 @@ def bar_selected_ids(selection, column):  # select ids for each column
 
 
 def query_df_selected_ids(df, col, selected_ids):
-    # print(col,selected_ids)
     if (col == "county_top") | (col == "county_bottom"):
         col = "county"
-    print(df[col].unique())
     return df[df[col].isin(selected_ids)]
 
 
