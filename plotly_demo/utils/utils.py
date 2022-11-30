@@ -10,6 +10,7 @@ import cupy as cp
 import pickle
 import datashader.transfer_functions as tf
 import pandas as pd
+import dask.dataframe as dd
 
 # Colors
 bgcolor = "#000000"  # mapbox dark map land color
@@ -461,6 +462,7 @@ def query_df_selected_ids(df, col, selected_ids):
     # print(col,selected_ids)
     if (col == "county_top") | (col == "county_bottom"):
         col = "county"
+    print(df[col].unique())
     return df[df[col].isin(selected_ids)]
 
 
@@ -501,10 +503,7 @@ def build_histogram_default_bins(
     if (column == "county_top") | (column == "county_bottom"):
         column = "county"
 
-    print(df)
-    print(type(df))
     if isinstance(df, dask_cudf.core.DataFrame):
-        print("here")
         df = df[[column, "net"]].groupby(column)["net"].count().compute().to_pandas()
     elif isinstance(df, cudf.DataFrame):
         df = df[[column, "net"]].groupby(column)["net"].count().to_pandas()
@@ -600,6 +599,19 @@ def build_histogram_default_bins(
 
     return fig
 
+def cull_empty_partitions(df):
+    ll = list(df.map_partitions(len).compute())
+    df_delayed = df.to_delayed()
+    df_delayed_new = list()
+    pempty = None
+    for ix, n in enumerate(ll):
+        if 0 == n:
+            pempty = df.get_partition(ix)
+        else:
+            df_delayed_new.append(df_delayed[ix])
+    if pempty is not None:
+        df = dd.from_delayed(df_delayed_new, meta=pempty)
+    return df
 
 def build_updated_figures_dask(
     df,
@@ -699,7 +711,7 @@ def build_updated_figures_dask(
     x_range, y_range = zip(*coordinates_3857)
     x0, x1 = x_range
     y0, y1 = y_range
-
+    
     if selected_map is not None:
         coordinates_4326 = selected_map["range"]["mapbox"]
         coordinates_3857 = epsg_4326_to_3857(coordinates_4326)
@@ -727,7 +739,10 @@ def build_updated_figures_dask(
         # df["net"] = df["net"].astype("category")
 
     for col in selected:
-        df = df.map_partitions(query_df_selected_ids, col, selected[col]).persist()
+        df = df.map_partitions(query_df_selected_ids, col, selected[col])
+
+    # cull empty partitions
+    df = cull_empty_partitions(df).persist()
 
     datashader_plot = build_datashader_plot(
         df,
@@ -1070,7 +1085,7 @@ def check_dataset(dataset_url, data_path):
         print(f"Found dataset at {data_path}")
 
 
-def load_dataset(path):
+def load_dataset(path, dtype="dask_cudf"):
     """
     Args:
         path: Path to arrow file containing mortgage dataset
@@ -1079,4 +1094,6 @@ def load_dataset(path):
     """
     if os.path.isdir(path):
         path = path + '/*'
+    if dtype == "dask":
+        return dd.read_parquet(path, split_row_groups=True)
     return dask_cudf.read_parquet(path, split_row_groups=True)
