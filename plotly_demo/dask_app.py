@@ -420,7 +420,11 @@ def register_update_plots_callback(client):
         else:
             coordinates_4326_backup, position_backup = None, None
 
-        df = client.get_dataset("c_df_d")
+        # Get delayed dataset from client
+        if gpu_enabled:
+            df = client.get_dataset('c_df_d')
+        else:
+            df = client.get_dataset('pd_df_d')
             
         colorscale_name = "Viridis"
         
@@ -523,15 +527,17 @@ def publish_dataset_to_cluster():
     # Load dataset and persist dataset on cluster
     def load_and_publish_dataset():
         # dask_cudf DataFrame
-        c_df_d = load_dataset(data_path).persist()
+        c_df_d = load_dataset(data_path, "dask_cudf").persist()
+        # pandas DataFrame
+        pd_df_d = load_dataset(data_path, "dask").persist()
 
-        # print(type(c_df_d))
         # Unpublish datasets if present
-        for ds_name in ['c_df_d']:
+        for ds_name in ['pd_df_d', 'c_df_d']:
             if ds_name in client.datasets:
                 client.unpublish_dataset(ds_name)
 
         # Publish datasets to the cluster
+        client.publish_dataset(pd_df_d=pd_df_d)
         client.publish_dataset(c_df_d=c_df_d)
 
     load_and_publish_dataset()
