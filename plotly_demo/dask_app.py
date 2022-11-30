@@ -321,12 +321,11 @@ app.layout = html.Div(
                 ),
                 dcc.Markdown(
                     """\
-**Important Data Caveats:** Geospatially filtered data will show accurate distribution, but due to anonymized, multiple cross filtered distributions will not return meaningful results. See [FAQ](https://github.com/rapidsai/plotly-dash-rapids-census-demo/tree/master#faq-and-known-issues) fore details.
-- 2010 Population Census and 2018 ACS data used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](https://www.nhgis.org/) ( not for redistribution ).
+- 2010 Population Census and 2020 Population Census Datasets.
 - Base map layer provided by [Mapbox](https://www.mapbox.com/).
 - Dashboard developed with [Plotly Dash](https://plotly.com/dash/).
 - Geospatial point rendering developed with [Datashader](https://datashader.org/).
-- GPU toggle accelerated with [RAPIDS cudf](https://rapids.ai/) and [cupy](https://cupy.chainer.org/), CPU toggle with [pandas](https://pandas.pydata.org/).
+- GPU toggle accelerated with [RAPIDS cudf and dask_cudf](https://rapids.ai/) and [cupy](https://cupy.chainer.org/), CPU toggle with [pandas](https://pandas.pydata.org/).
 - For source code and data workflow, visit our [GitHub](https://github.com/rapidsai/plotly-dash-rapids-census-demo/tree/master).
 """
                 ),
