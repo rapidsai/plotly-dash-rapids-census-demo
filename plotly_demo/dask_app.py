@@ -17,7 +17,18 @@ from utils.utils import *
 # ### Dashboards start here
 text_color = "#cfd8dc"  # Material blue-grey 100
 
-data_center_3857, data_3857, data_4326, data_center_4326 = [], [], [], []
+(
+    data_center_3857,
+    data_3857,
+    data_4326,
+    data_center_4326,
+    selected_map_backup,
+    selected_race_backup,
+    selected_county_top_backup,
+    selected_county_bt_backup,
+    view_name_backup,
+) = ([], [], [], [], None, None, None, None, None)
+
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 app.layout = html.Div(
@@ -197,9 +208,7 @@ app.layout = html.Div(
             ]
         ),
         ########## End of options bar #######################################
-        html.Hr(
-            id="line1", style={"border": "1px solid grey", "margin": "0px"}
-        ),
+        html.Hr(id="line1", style={"border": "1px solid grey", "margin": "0px"}),
         # html.Div( html.Hr(id='line',style={'border': '1px solid red'}) ),
         ##################### Map starts  ###################################
         html.Div(
@@ -219,17 +228,13 @@ app.layout = html.Div(
                     figure=blank_fig(440),
                 ),
                 # Hidden div inside the app that stores the intermediate value
-                html.Div(
-                    id="intermediate-state-value", style={"display": "none"}
-                ),
+                html.Div(id="intermediate-state-value", style={"display": "none"}),
             ],
             className="columns pretty_container",
             style={"width": "100%", "margin-right": "0", "height": "66%"},
             id="map-div",
         ),
-        html.Hr(
-            id="line2", style={"border": "1px solid grey", "margin": "0px"}
-        ),
+        html.Hr(id="line2", style={"border": "1px solid grey", "margin": "0px"}),
         ################# Bars start #########################
         # Race start
         html.Div(
@@ -307,9 +312,7 @@ app.layout = html.Div(
             style={"width": "33.33%", "height": "20%"},
         ),
         ############## End of  Bars #####################
-        html.Hr(
-            id="line3", style={"border": "1px solid grey", "margin": "0px"}
-        ),
+        html.Hr(id="line3", style={"border": "1px solid grey", "margin": "0px"}),
         html.Div(
             [
                 html.H4(
@@ -371,12 +374,14 @@ def clear_county_hist_bottom_selections(*args):
 
 # # Query string helpers
 
+
 def register_update_plots_callback(client):
     """
     Register Dash callback that updates all plots in response to selection events
     Args:
         df_d: Dask.delayed pandas or cudf DataFrame
     """
+
     @app.callback(
         [
             Output("indicator-graph", "figure"),
@@ -399,7 +404,19 @@ def register_update_plots_callback(client):
             Input("view-dropdown", "value"),
             Input("gpu-toggle", "on"),
         ],
-        [State("intermediate-state-value", "children")],
+        [
+            State("intermediate-state-value", "children"),
+            State("indicator-graph", "figure"),
+            State("map-graph", "figure"),
+            State("map-graph", "config"),
+            State("county-histogram-top", "figure"),
+            State("county-histogram-top", "config"),
+            State("county-histogram-bottom", "figure"),
+            State("county-histogram-bottom", "config"),
+            State("race-histogram", "figure"),
+            State("race-histogram", "config"),
+            State("intermediate-state-value", "children"),
+        ],
     )
     def update_plots(
         relayout_data,
@@ -410,8 +427,27 @@ def register_update_plots_callback(client):
         view_name,
         gpu_enabled,
         coordinates_backup,
+        *backup_args,
     ):
-        global data_3857, data_center_3857, data_4326, data_center_4326
+        global data_3857, data_center_3857, data_4326, data_center_4326, selected_map_backup, selected_race_backup, selected_county_top_backup, selected_county_bt_backup, view_name_backup
+
+        # condition to avoid reloading on tool update
+        if (
+            type(relayout_data) == dict
+            and list(relayout_data.keys()) == ["dragmode"]
+            and selected_map == selected_map_backup
+            and selected_race_backup == selected_race
+            and selected_county_top_backup == selected_county_top
+            and selected_county_bt_backup == selected_county_bottom
+            and view_name_backup == view_name
+        ):
+            return backup_args
+
+        selected_map_backup = selected_map
+        selected_race_backup = selected_race
+        selected_county_top_backup = selected_county_top
+        selected_county_bt_backup = selected_county_bottom
+        view_name_backup = view_name
 
         t0 = time.time()
 
@@ -422,15 +458,20 @@ def register_update_plots_callback(client):
 
         # Get delayed dataset from client
         if gpu_enabled:
-            df = client.get_dataset('c_df_d')
+            df = client.get_dataset("c_df_d")
         else:
-            df = client.get_dataset('pd_df_d')
-            
+            df = client.get_dataset("pd_df_d")
+
         colorscale_name = "Viridis"
-        
+
         if data_3857 == []:
             projections = delayed(set_projection_bounds)(df)
-            data_3857, data_center_3857, data_4326, data_center_4326 = projections.compute()
+            (
+                data_3857,
+                data_center_3857,
+                data_4326,
+                data_center_4326,
+            ) = projections.compute()
 
         figures = build_updated_figures_dask(
             df,
@@ -515,7 +556,7 @@ def register_update_plots_callback(client):
 
 def publish_dataset_to_cluster():
 
-    census_data_url = 'https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/total_population_dataset.parquet'
+    census_data_url = "https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/total_population_dataset.parquet"
     data_path = "../data/total_population_dataset.parquet"
     check_dataset(census_data_url, data_path)
 
@@ -532,7 +573,7 @@ def publish_dataset_to_cluster():
         pd_df_d = load_dataset(data_path, "dask").persist()
 
         # Unpublish datasets if present
-        for ds_name in ['pd_df_d', 'c_df_d']:
+        for ds_name in ["pd_df_d", "c_df_d"]:
             if ds_name in client.datasets:
                 client.unpublish_dataset(ds_name)
 
@@ -543,16 +584,15 @@ def publish_dataset_to_cluster():
     load_and_publish_dataset()
 
     # Precompute field bounds
-    c_df_d = client.get_dataset('c_df_d')
+    c_df_d = client.get_dataset("c_df_d")
 
     # Register top-level callback that updates plots
     register_update_plots_callback(client)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # development entry point
     publish_dataset_to_cluster()
 
     # Launch dashboard
-    app.run_server(
-        debug=False, dev_tools_silence_routes_logging=True, host='0.0.0.0')
+    app.run_server(debug=False, dev_tools_silence_routes_logging=True, host="0.0.0.0")

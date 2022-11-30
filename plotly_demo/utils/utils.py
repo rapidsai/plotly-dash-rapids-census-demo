@@ -19,15 +19,15 @@ mapbox_land_color = "#000000"
 c = 9200
 # Colors for categories
 colors = {}
-colors["race"] = [
-    "aqua",
-    "lime",
-    "yellow",
-    "orange",
-    "blue",
-    "fuchsia",
-    "saddlebrown",
-]
+colors["race"] = {
+    1: "aqua",
+    2: "lime",
+    3: "yellow",
+    4: "orange",
+    5: "blue",
+    6: "fuchsia",
+    7: "saddlebrown",
+}
 race2color = {
     "White": "aqua",
     "African American": "lime",
@@ -37,11 +37,11 @@ race2color = {
     "Other Race alone": "fuchsia",
     "Two or More": "saddlebrown",
 }
-colors["net"] = [
-    palettes.RdPu9[2],
-    palettes.Greens9[4],
-    palettes.PuBu9[2],
-]  # '#32CD32'
+colors["net"] = {
+    -1: palettes.RdPu9[2],
+    0: palettes.Greens9[4],
+    1: palettes.PuBu9[2],
+}  # '#32CD32'
 
 
 # Figure template
@@ -86,21 +86,18 @@ if not token:
         print("mapbox token not found, using open-street-maps")
         mapbox_style = "carto-darkmatter"
 
+
 def set_projection_bounds(df_d):
     transformer_4326_to_3857 = Transformer.from_crs("epsg:4326", "epsg:3857")
 
     def epsg_4326_to_3857(coords):
-        return [
-            transformer_4326_to_3857.transform(*reversed(row))
-            for row in coords
-        ]
+        return [transformer_4326_to_3857.transform(*reversed(row)) for row in coords]
 
     transformer_3857_to_4326 = Transformer.from_crs("epsg:3857", "epsg:4326")
 
     def epsg_3857_to_4326(coords):
         return [
-            list(reversed(transformer_3857_to_4326.transform(*row)))
-            for row in coords
+            list(reversed(transformer_3857_to_4326.transform(*row))) for row in coords
         ]
 
     data_3857 = (
@@ -139,6 +136,7 @@ def blank_fig(height):
         },
     }
 
+
 # Plot functions
 def build_colorscale(colorscale_name, transform):
     """
@@ -165,10 +163,12 @@ def build_colorscale(colorscale_name, transform):
         raise ValueError("Unexpected colorscale transform")
     return [(v, clr) for v, clr in zip(scale_values, colors_temp)]
 
+
 def get_min_max(df, col):
     if isinstance(df, dask_cudf.core.DataFrame):
         return (df[col].min().compute(), df[col].max().compute())
     return (df[col].min(), df[col].max())
+
 
 def build_datashader_plot(
     df,
@@ -187,9 +187,7 @@ def build_datashader_plot(
 
     datashader_color_scale = {}
 
-    cvs = ds.Canvas(
-        plot_width=3840, plot_height=2160, x_range=x_range, y_range=y_range
-    )
+    cvs = ds.Canvas(plot_width=3840, plot_height=2160, x_range=x_range, y_range=y_range)
 
     colorscale_transform = "linear"
 
@@ -217,13 +215,11 @@ def build_datashader_plot(
         aggregate = "mean"
 
     if aggregate == "mean":
-        datashader_color_scale["cmap"] = colors[aggregate_column]
-        datashader_color_scale["how"] = "linear"
-        datashader_color_scale["span"] = get_min_max(df, aggregate_column)
+        datashader_color_scale["color_key"] = colors[aggregate_column]
+        datashader_color_scale["how"] = "log"
     else:
         datashader_color_scale["cmap"] = [
-            i[1]
-            for i in build_colorscale(colorscale_name, colorscale_transform)
+            i[1] for i in build_colorscale(colorscale_name, colorscale_transform)
         ]
         datashader_color_scale["how"] = "log"
 
@@ -241,6 +237,8 @@ def build_datashader_plot(
     temp = agg.sum()
     temp.data = cp.asnumpy(temp.data)
     n_selected = int(temp)
+
+    print(datashader_color_scale)
 
     if n_selected == 0:
         # Nothing to display
@@ -343,22 +341,22 @@ def build_datashader_plot(
                     ],
                     "ypad": 30,
                 },
-                # colorscale=[(1, colors['race'][1]),(2, colors['race'][2]), (3, colors['race'][3]),(4, colors['race'][4]), (5, colors['race'][5]),(6, colors['race'][6]),(7, colors['race'][7])],
                 colorscale=[
-                    (0 / 7, colors["race"][0]),
-                    (1 / 7, colors["race"][0]),
+                    (0 / 7, colors["race"][1]),
                     (1 / 7, colors["race"][1]),
-                    (2 / 7, colors["race"][1]),
+                    (1 / 7, colors["race"][2]),
                     (2 / 7, colors["race"][2]),
-                    (3 / 7, colors["race"][2]),
+                    (2 / 7, colors["race"][3]),
                     (3 / 7, colors["race"][3]),
-                    (4 / 7, colors["race"][3]),
+                    (3 / 7, colors["race"][4]),
                     (4 / 7, colors["race"][4]),
-                    (5 / 7, colors["race"][4]),
+                    (4 / 7, colors["race"][5]),
                     (5 / 7, colors["race"][5]),
-                    (6 / 7, colors["race"][5]),
+                    (5 / 7, colors["race"][6]),
                     (6 / 7, colors["race"][6]),
-                    (7 / 7, colors["race"][6]),
+                    (6 / 7, colors["race"][7]),
+                    (7 / 7, colors["race"][7]),
+                    (7 / 7, colors["race"][7]),
                 ],
                 cmin=0,
                 cmax=1,
@@ -380,12 +378,12 @@ def build_datashader_plot(
                     "ypad": 30,
                 },
                 colorscale=[
-                    (0 / 3, colors["net"][0]),
+                    (0 / 3, colors["net"][-1]),
+                    (1 / 3, colors["net"][-1]),
                     (1 / 3, colors["net"][0]),
-                    (1 / 3, colors["net"][1]),
+                    (2 / 3, colors["net"][0]),
                     (2 / 3, colors["net"][1]),
-                    (2 / 3, colors["net"][2]),
-                    (3 / 3, colors["net"][2]),
+                    (3 / 3, colors["net"][1]),
                 ],
                 cmin=0,
                 cmax=1,
@@ -505,6 +503,8 @@ def build_histogram_default_bins(
         df = df[[column, "net"]].groupby(column)["net"].count().compute().to_pandas()
     elif isinstance(df, cudf.DataFrame):
         df = df[[column, "net"]].groupby(column)["net"].count().to_pandas()
+    elif isinstance(df, dd.core.DataFrame):
+        df = df[[column, "net"]].groupby(column)["net"].count().compute()
     else:
         df = df[[column, "net"]].groupby(column)["net"].count()
 
@@ -597,6 +597,7 @@ def build_histogram_default_bins(
 
     return fig
 
+
 def cull_empty_partitions(df):
     ll = list(df.map_partitions(len).compute())
     df_delayed = df.to_delayed()
@@ -610,6 +611,7 @@ def cull_empty_partitions(df):
     if pempty is not None:
         df = dd.from_delayed(df_delayed_new, meta=pempty)
     return df
+
 
 def build_updated_figures_dask(
     df,
@@ -640,19 +642,14 @@ def build_updated_figures_dask(
     }
 
     if relayout_data is not None:
-        transformer_4326_to_3857 = Transformer.from_crs(
-            "epsg:4326", "epsg:3857"
-        )
+        transformer_4326_to_3857 = Transformer.from_crs("epsg:4326", "epsg:3857")
 
     def epsg_4326_to_3857(coords):
-        return [
-            transformer_4326_to_3857.transform(*reversed(row))
-            for row in coords
-        ]
+        return [transformer_4326_to_3857.transform(*reversed(row)) for row in coords]
 
-    coordinates_4326 = relayout_data and relayout_data.get(
-        "mapbox._derived", {}
-    ).get("coordinates", None)
+    coordinates_4326 = relayout_data and relayout_data.get("mapbox._derived", {}).get(
+        "coordinates", None
+    )
     dragmode = (
         relayout_data
         and "dragmode" in relayout_data
@@ -665,12 +662,8 @@ def build_updated_figures_dask(
         position = position_backup
     elif coordinates_4326:
         lons, lats = zip(*coordinates_4326)
-        lon0, lon1 = max(min(lons), data_4326[0][0]), min(
-            max(lons), data_4326[1][0]
-        )
-        lat0, lat1 = max(min(lats), data_4326[0][1]), min(
-            max(lats), data_4326[1][1]
-        )
+        lon0, lon1 = max(min(lons), data_4326[0][0]), min(max(lons), data_4326[1][0])
+        lat0, lat1 = max(min(lats), data_4326[0][1]), min(max(lats), data_4326[1][1])
         coordinates_4326 = [
             [lon0, lat0],
             [lon1, lat1],
@@ -709,14 +702,16 @@ def build_updated_figures_dask(
     x_range, y_range = zip(*coordinates_3857)
     x0, x1 = x_range
     y0, y1 = y_range
-    
+
     if selected_map is not None:
         coordinates_4326 = selected_map["range"]["mapbox"]
         coordinates_3857 = epsg_4326_to_3857(coordinates_4326)
         x_range_t, y_range_t = zip(*coordinates_3857)
         x0, x1 = x_range_t
         y0, y1 = y_range_t
-        df = df.map_partitions(query_df_range_lat_lon, x0, x1, y0, y1, "easting", "northing").persist()
+        df = df.map_partitions(
+            query_df_range_lat_lon, x0, x1, y0, y1, "easting", "northing"
+        ).persist()
 
     # Select points as per view
 
@@ -828,7 +823,7 @@ def build_updated_figures_dask(
 
     # print("COUNTY BOTTOM done")
 
-    del (df)
+    del df
     return (
         datashader_plot,
         county_top_histogram,
@@ -838,6 +833,7 @@ def build_updated_figures_dask(
         coordinates_4326_backup,
         position_backup,
     )
+
 
 def build_updated_figures(
     df,
@@ -869,19 +865,14 @@ def build_updated_figures(
     }
 
     if relayout_data is not None:
-        transformer_4326_to_3857 = Transformer.from_crs(
-            "epsg:4326", "epsg:3857"
-        )
+        transformer_4326_to_3857 = Transformer.from_crs("epsg:4326", "epsg:3857")
 
     def epsg_4326_to_3857(coords):
-        return [
-            transformer_4326_to_3857.transform(*reversed(row))
-            for row in coords
-        ]
+        return [transformer_4326_to_3857.transform(*reversed(row)) for row in coords]
 
-    coordinates_4326 = relayout_data and relayout_data.get(
-        "mapbox._derived", {}
-    ).get("coordinates", None)
+    coordinates_4326 = relayout_data and relayout_data.get("mapbox._derived", {}).get(
+        "coordinates", None
+    )
     dragmode = (
         relayout_data
         and "dragmode" in relayout_data
@@ -894,12 +885,8 @@ def build_updated_figures(
         position = position_backup
     elif coordinates_4326:
         lons, lats = zip(*coordinates_4326)
-        lon0, lon1 = max(min(lons), data_4326[0][0]), min(
-            max(lons), data_4326[1][0]
-        )
-        lat0, lat1 = max(min(lats), data_4326[0][1]), min(
-            max(lats), data_4326[1][1]
-        )
+        lon0, lon1 = max(min(lons), data_4326[0][0]), min(max(lons), data_4326[1][0])
+        lat0, lat1 = max(min(lats), data_4326[0][1]), min(max(lats), data_4326[1][1])
         coordinates_4326 = [
             [lon0, lat0],
             [lon1, lat1],
@@ -1055,7 +1042,7 @@ def build_updated_figures(
 
     # print("COUNTY BOTTOM done")
 
-    del (df)
+    del df
     return (
         datashader_plot,
         county_top_histogram,
@@ -1066,19 +1053,22 @@ def build_updated_figures(
         position_backup,
     )
 
+
 def check_dataset(dataset_url, data_path):
     if not os.path.exists(data_path):
-        print(f"Dataset not found at "+data_path+".\n"
-              f"Downloading from {dataset_url}")
+        print(
+            f"Dataset not found at " + data_path + ".\n"
+            f"Downloading from {dataset_url}"
+        )
         # Download dataset to data directory
-        os.makedirs('../data', exist_ok=True)
+        os.makedirs("./data", exist_ok=True)
         with requests.get(dataset_url, stream=True) as r:
             r.raise_for_status()
-            with open(data_path, 'wb') as f:
+            with open(data_path, "wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
-        print('Download completed!')
+        print("Download completed!")
     else:
         print(f"Found dataset at {data_path}")
 
@@ -1091,7 +1081,9 @@ def load_dataset(path, dtype="dask_cudf"):
         pandas DataFrame
     """
     if os.path.isdir(path):
-        path = path + '/*'
+        path = path + "/*"
     if dtype == "dask":
         return dd.read_parquet(path, split_row_groups=True)
-    return dask_cudf.read_parquet(path, split_row_groups=True)
+    elif dtype == "dask_cudf":
+        return dask_cudf.read_parquet(path, split_row_groups=True)
+    return cudf.read_parquet(path)

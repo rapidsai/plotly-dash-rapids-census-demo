@@ -9,21 +9,23 @@ import dash_bootstrap_components as dbc
 import time
 import dash_daq as daq
 import dash
-from dask import delayed
 from distributed import Client
-from dask_cuda import LocalCUDACluster
 from utils.utils import *
 
 # ### Dashboards start here
 text_color = "#cfd8dc"  # Material blue-grey 100
 
-
-
-data_center_3857, data_3857, data_4326, data_center_4326 = [], [], [], []
-census_data_url = 'https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/total_population_dataset.parquet'
-data_path = "../data/total_population_dataset.parquet"
-check_dataset(census_data_url, data_path)
-df = cudf.read_parquet("../data/total_population_dataset.parquet")
+(
+    data_center_3857,
+    data_3857,
+    data_4326,
+    data_center_4326,
+    selected_map_backup,
+    selected_race_backup,
+    selected_county_top_backup,
+    selected_county_bt_backup,
+    view_name_backup,
+) = ([], [], [], [], None, None, None, None, None)
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 app.layout = html.Div(
@@ -203,9 +205,7 @@ app.layout = html.Div(
             ]
         ),
         ########## End of options bar #######################################
-        html.Hr(
-            id="line1", style={"border": "1px solid grey", "margin": "0px"}
-        ),
+        html.Hr(id="line1", style={"border": "1px solid grey", "margin": "0px"}),
         # html.Div( html.Hr(id='line',style={'border': '1px solid red'}) ),
         ##################### Map starts  ###################################
         html.Div(
@@ -225,17 +225,13 @@ app.layout = html.Div(
                     figure=blank_fig(440),
                 ),
                 # Hidden div inside the app that stores the intermediate value
-                html.Div(
-                    id="intermediate-state-value", style={"display": "none"}
-                ),
+                html.Div(id="intermediate-state-value", style={"display": "none"}),
             ],
             className="columns pretty_container",
             style={"width": "100%", "margin-right": "0", "height": "66%"},
             id="map-div",
         ),
-        html.Hr(
-            id="line2", style={"border": "1px solid grey", "margin": "0px"}
-        ),
+        html.Hr(id="line2", style={"border": "1px solid grey", "margin": "0px"}),
         ################# Bars start #########################
         # Race start
         html.Div(
@@ -313,9 +309,7 @@ app.layout = html.Div(
             style={"width": "33.33%", "height": "20%"},
         ),
         ############## End of  Bars #####################
-        html.Hr(
-            id="line3", style={"border": "1px solid grey", "margin": "0px"}
-        ),
+        html.Hr(id="line3", style={"border": "1px solid grey", "margin": "0px"}),
         html.Div(
             [
                 html.H4(
@@ -376,139 +370,219 @@ def clear_county_hist_bottom_selections(*args):
 
 
 # # Query string helpers
-@app.callback(
-    [
-        Output("indicator-graph", "figure"),
-        Output("map-graph", "figure"),
-        Output("map-graph", "config"),
-        Output("county-histogram-top", "figure"),
-        Output("county-histogram-top", "config"),
-        Output("county-histogram-bottom", "figure"),
-        Output("county-histogram-bottom", "config"),
-        Output("race-histogram", "figure"),
-        Output("race-histogram", "config"),
-        Output("intermediate-state-value", "children"),
-    ],
-    [
-        Input("map-graph", "relayoutData"),
-        Input("map-graph", "selectedData"),
-        Input("race-histogram", "selectedData"),
-        Input("county-histogram-top", "selectedData"),
-        Input("county-histogram-bottom", "selectedData"),
-        Input("view-dropdown", "value"),
-        Input("gpu-toggle", "on"),
-    ],
-    [State("intermediate-state-value", "children")],
-)
-def update_plots(
-    relayout_data,
-    selected_map,
-    selected_race,
-    selected_county_top,
-    selected_county_bottom,
-    view_name,
-    gpu_enabled,
-    coordinates_backup,
-):
-    global df, data_3857, data_center_3857, data_4326, data_center_4326
 
-    t0 = time.time()
 
-    if coordinates_backup is not None:
-        coordinates_4326_backup, position_backup = coordinates_backup
-    else:
-        coordinates_4326_backup, position_backup = None, None
+def register_update_plots_callback(client):
+    """
+    Register Dash callback that updates all plots in response to selection events
+    Args:
+        df_d: Dask.delayed pandas or cudf DataFrame
+    """
 
-    if not gpu_enabled:
-        df = df.to_pandas()
-        
-    colorscale_name = "Viridis"
-    
-    if data_3857 == []:
-        projections = set_projection_bounds(df)
-        data_3857, data_center_3857, data_4326, data_center_4326 = projections
-
-    # try:
-    figures = build_updated_figures(
-        df,
+    @app.callback(
+        [
+            Output("indicator-graph", "figure"),
+            Output("map-graph", "figure"),
+            Output("map-graph", "config"),
+            Output("county-histogram-top", "figure"),
+            Output("county-histogram-top", "config"),
+            Output("county-histogram-bottom", "figure"),
+            Output("county-histogram-bottom", "config"),
+            Output("race-histogram", "figure"),
+            Output("race-histogram", "config"),
+            Output("intermediate-state-value", "children"),
+        ],
+        [
+            Input("map-graph", "relayoutData"),
+            Input("map-graph", "selectedData"),
+            Input("race-histogram", "selectedData"),
+            Input("county-histogram-top", "selectedData"),
+            Input("county-histogram-bottom", "selectedData"),
+            Input("view-dropdown", "value"),
+            Input("gpu-toggle", "on"),
+        ],
+        [
+            State("intermediate-state-value", "children"),
+            State("indicator-graph", "figure"),
+            State("map-graph", "figure"),
+            State("map-graph", "config"),
+            State("county-histogram-top", "figure"),
+            State("county-histogram-top", "config"),
+            State("county-histogram-bottom", "figure"),
+            State("county-histogram-bottom", "config"),
+            State("race-histogram", "figure"),
+            State("race-histogram", "config"),
+            State("intermediate-state-value", "children"),
+        ],
+    )
+    def update_plots(
         relayout_data,
         selected_map,
         selected_race,
         selected_county_top,
         selected_county_bottom,
-        colorscale_name,
-        data_3857,
-        data_center_3857,
-        data_4326,
-        data_center_4326,
-        coordinates_4326_backup,
-        position_backup,
         view_name,
-    )
-    (
-        datashader_plot,
-        race_histogram,
-        county_top_histogram,
-        county_bottom_histogram,
-        n_selected_indicator,
-        coordinates_4326_backup,
-        position_backup,
-    ) = figures
+        gpu_enabled,
+        coordinates_backup,
+        *backup_args,
+    ):
+        global data_3857, data_center_3857, data_4326, data_center_4326, selected_map_backup, selected_race_backup, selected_county_top_backup, selected_county_bt_backup, view_name_backup
 
-    barchart_config = {
-        "displayModeBar": True,
-        "modeBarButtonsToRemove": [
-            "zoom2d",
-            "pan2d",
-            "select2d",
-            "lasso2d",
-            "zoomIn2d",
-            "zoomOut2d",
-            "resetScale2d",
-            "hoverClosestCartesian",
-            "hoverCompareCartesian",
-            "toggleSpikelines",
-        ],
-    }
-    compute_time = time.time() - t0
-    # print(f"Update time: {compute_time}")
-    n_selected_indicator["data"].append(
-        {
-            "title": {"text": "Query Time"},
-            "type": "indicator",
-            "value": round(compute_time, 4),
-            "domain": {"x": [0.53, 0.61], "y": [0, 0.5]},
-            "number": {
-                "font": {
-                    "color": text_color,
-                    "size": "50px",
-                },
-                "suffix": " seconds",
-            },
-        }
-    )
-    return (
-        n_selected_indicator,
-        datashader_plot,
-        {
+        # condition to avoid reloading on tool update
+        if (
+            type(relayout_data) == dict
+            and list(relayout_data.keys()) == ["dragmode"]
+            and selected_map == selected_map_backup
+            and selected_race_backup == selected_race
+            and selected_county_top_backup == selected_county_top
+            and selected_county_bt_backup == selected_county_bottom
+            and view_name_backup == view_name
+        ):
+            return backup_args
+
+        selected_map_backup = selected_map
+        selected_race_backup = selected_race
+        selected_county_top_backup = selected_county_top
+        selected_county_bt_backup = selected_county_bottom
+        view_name_backup = view_name
+        t0 = time.time()
+
+        if coordinates_backup is not None:
+            coordinates_4326_backup, position_backup = coordinates_backup
+        else:
+            coordinates_4326_backup, position_backup = None, None
+
+        # Get dataset from client
+        if gpu_enabled:
+            df = client.get_dataset("c_df_d")
+        else:
+            df = client.get_dataset("pd_df_d")
+
+        colorscale_name = "Viridis"
+
+        if data_3857 == []:
+            (
+                data_3857,
+                data_center_3857,
+                data_4326,
+                data_center_4326,
+            ) = set_projection_bounds(df)
+
+        (
+            datashader_plot,
+            race_histogram,
+            county_top_histogram,
+            county_bottom_histogram,
+            n_selected_indicator,
+            coordinates_4326_backup,
+            position_backup,
+        ) = build_updated_figures(
+            df,
+            relayout_data,
+            selected_map,
+            selected_race,
+            selected_county_top,
+            selected_county_bottom,
+            colorscale_name,
+            data_3857,
+            data_center_3857,
+            data_4326,
+            data_center_4326,
+            coordinates_4326_backup,
+            position_backup,
+            view_name,
+        )
+
+        barchart_config = {
             "displayModeBar": True,
             "modeBarButtonsToRemove": [
+                "zoom2d",
+                "pan2d",
+                "select2d",
                 "lasso2d",
-                "zoomInMapbox",
-                "zoomOutMapbox",
-                "toggleHover",
+                "zoomIn2d",
+                "zoomOut2d",
+                "resetScale2d",
+                "hoverClosestCartesian",
+                "hoverCompareCartesian",
+                "toggleSpikelines",
             ],
-        },
-        race_histogram,
-        barchart_config,
-        county_top_histogram,
-        barchart_config,
-        county_bottom_histogram,
-        barchart_config,
-        (coordinates_4326_backup, position_backup),
-    )
+        }
+        compute_time = time.time() - t0
+        # print(f"Update time: {compute_time}")
+        n_selected_indicator["data"].append(
+            {
+                "title": {"text": "Query Time"},
+                "type": "indicator",
+                "value": round(compute_time, 4),
+                "domain": {"x": [0.53, 0.61], "y": [0, 0.5]},
+                "number": {
+                    "font": {
+                        "color": text_color,
+                        "size": "50px",
+                    },
+                    "suffix": " seconds",
+                },
+            }
+        )
+        return (
+            n_selected_indicator,
+            datashader_plot,
+            {
+                "displayModeBar": True,
+                "modeBarButtonsToRemove": [
+                    "lasso2d",
+                    "zoomInMapbox",
+                    "zoomOutMapbox",
+                    "toggleHover",
+                ],
+            },
+            race_histogram,
+            barchart_config,
+            county_top_histogram,
+            barchart_config,
+            county_bottom_histogram,
+            barchart_config,
+            (coordinates_4326_backup, position_backup),
+        )
 
-if __name__ == '__main__':
+
+def publish_dataset_to_cluster():
+
+    census_data_url = "https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/total_population_dataset.parquet"
+    data_path = "../data/total_population_dataset.parquet"
+    check_dataset(census_data_url, data_path)
+
+    client = Client()
+
+    # Load dataset and persist dataset on cluster
+    def load_and_publish_dataset():
+        # cudf DataFrame
+        c_df_d = load_dataset(data_path, "cudf")
+        # pandas DataFrame
+        pd_df_d = c_df_d.to_pandas()
+
+        # Unpublish datasets if present
+        for ds_name in ["pd_df_d", "c_df_d"]:
+            if ds_name in client.datasets:
+                client.unpublish_dataset(ds_name)
+
+        # Publish datasets to the cluster
+        client.publish_dataset(pd_df_d=pd_df_d)
+        client.publish_dataset(c_df_d=c_df_d)
+
+    load_and_publish_dataset()
+
+    # Precompute field bounds
+    c_df_d = client.get_dataset("c_df_d")
+
+    # Register top-level callback that updates plots
+    register_update_plots_callback(client)
+
+
+if __name__ == "__main__":
+    # development entry point
+    publish_dataset_to_cluster()
+
     # Launch dashboard
-    app.run_server(
-        debug=False, dev_tools_silence_routes_logging=True, host='0.0.0.0')
+    app.run_server(debug=False, dev_tools_silence_routes_logging=True, host="0.0.0.0")
