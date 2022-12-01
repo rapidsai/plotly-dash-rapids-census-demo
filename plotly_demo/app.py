@@ -25,7 +25,8 @@ text_color = "#cfd8dc"  # Material blue-grey 100
     selected_county_top_backup,
     selected_county_bt_backup,
     view_name_backup,
-) = ([], [], [], [], None, None, None, None, None)
+    c_df,
+) = ([], [], [], [], None, None, None, None, None, None)
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 app.layout = html.Div(
@@ -371,7 +372,7 @@ def clear_county_hist_bottom_selections(*args):
 # # Query string helpers
 
 
-def register_update_plots_callback(client):
+def register_update_plots_callback():
     """
     Register Dash callback that updates all plots in response to selection events
     Args:
@@ -425,7 +426,7 @@ def register_update_plots_callback(client):
         coordinates_backup,
         *backup_args,
     ):
-        global data_3857, data_center_3857, data_4326, data_center_4326, selected_map_backup, selected_race_backup, selected_county_top_backup, selected_county_bt_backup, view_name_backup
+        global data_3857, data_center_3857, data_4326, data_center_4326, selected_map_backup, selected_race_backup, selected_county_top_backup, selected_county_bt_backup, view_name_backup, c_df
 
         # condition to avoid reloading on tool update
         if (
@@ -453,9 +454,9 @@ def register_update_plots_callback(client):
 
         # Get dataset from client
         if gpu_enabled:
-            df = client.get_dataset("c_df_d")
+            df = c_df
         else:
-            df = client.get_dataset("pd_df_d")
+            df = c_df.to_pandas()
 
         colorscale_name = "Viridis"
 
@@ -547,36 +548,15 @@ def register_update_plots_callback(client):
 
 
 def publish_dataset_to_cluster():
-
+    global c_df
     census_data_url = "https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/total_population_dataset.parquet"
     data_path = "../data/total_population_dataset.parquet"
     check_dataset(census_data_url, data_path)
-
-    client = Client()
-
-    # Load dataset and persist dataset on cluster
-    def load_and_publish_dataset():
-        # cudf DataFrame
-        c_df_d = load_dataset(data_path, "cudf")
-        # pandas DataFrame
-        pd_df_d = c_df_d.to_pandas()
-
-        # Unpublish datasets if present
-        for ds_name in ["pd_df_d", "c_df_d"]:
-            if ds_name in client.datasets:
-                client.unpublish_dataset(ds_name)
-
-        # Publish datasets to the cluster
-        client.publish_dataset(pd_df_d=pd_df_d)
-        client.publish_dataset(c_df_d=c_df_d)
-
-    load_and_publish_dataset()
-
-    # Precompute field bounds
-    c_df_d = client.get_dataset("c_df_d")
+    # cudf DataFrame
+    c_df = load_dataset(data_path, "cudf")
 
     # Register top-level callback that updates plots
-    register_update_plots_callback(client)
+    register_update_plots_callback()
 
 
 if __name__ == "__main__":
