@@ -29,7 +29,9 @@ text_color = "#cfd8dc"  # Material blue-grey 100
     selected_county_top_backup,
     selected_county_bt_backup,
     view_name_backup,
-) = ([], [], [], [], None, None, None, None, None)
+    gpu_enabled_backup,
+    dragmode_backup
+) = ([], [], [], [], None, None, None, None, None, None, "pan")
 
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -388,6 +390,7 @@ def register_update_plots_callback(client):
             Output("indicator-graph", "figure"),
             Output("map-graph", "figure"),
             Output("map-graph", "config"),
+            Output("map-graph", "relayoutData"),
             Output("county-histogram-top", "figure"),
             Output("county-histogram-top", "config"),
             Output("county-histogram-bottom", "figure"),
@@ -410,6 +413,7 @@ def register_update_plots_callback(client):
             State("indicator-graph", "figure"),
             State("map-graph", "figure"),
             State("map-graph", "config"),
+            State("map-graph", "relayoutData"),
             State("county-histogram-top", "figure"),
             State("county-histogram-top", "config"),
             State("county-histogram-bottom", "figure"),
@@ -430,7 +434,7 @@ def register_update_plots_callback(client):
         coordinates_backup,
         *backup_args,
     ):
-        global data_3857, data_center_3857, data_4326, data_center_4326, selected_map_backup, selected_race_backup, selected_county_top_backup, selected_county_bt_backup, view_name_backup
+        global data_3857, data_center_3857, data_4326, data_center_4326, selected_map_backup, selected_race_backup, selected_county_top_backup, selected_county_bt_backup, view_name_backup, gpu_enabled_backup, dragmode_backup
 
         # condition to avoid reloading on tool update
         if (
@@ -441,7 +445,10 @@ def register_update_plots_callback(client):
             and selected_county_top_backup == selected_county_top
             and selected_county_bt_backup == selected_county_bottom
             and view_name_backup == view_name
+            and gpu_enabled_backup == gpu_enabled
         ):
+            backup_args[1]["layout"]["dragmode"] = relayout_data["dragmode"]
+            dragmode_backup = relayout_data["dragmode"]
             return backup_args
 
         selected_map_backup = selected_map
@@ -449,6 +456,7 @@ def register_update_plots_callback(client):
         selected_county_top_backup = selected_county_top
         selected_county_bt_backup = selected_county_bottom
         view_name_backup = view_name
+        gpu_enabled_backup = gpu_enabled
 
         t0 = time.time()
 
@@ -517,7 +525,7 @@ def register_update_plots_callback(client):
             ],
         }
         compute_time = time.time() - t0
-        # print(f"Update time: {compute_time}")
+        print(f"Query time: {compute_time}")
         n_selected_indicator["data"].append(
             {
                 "title": {"text": "Query Time"},
@@ -533,6 +541,10 @@ def register_update_plots_callback(client):
                 },
             }
         )
+        datashader_plot["layout"]["dragmode"] = (
+            relayout_data["dragmode"] if "dragmode" in relayout_data else dragmode_backup
+        )
+
         return (
             n_selected_indicator,
             datashader_plot,
@@ -545,6 +557,7 @@ def register_update_plots_callback(client):
                     "toggleHover",
                 ],
             },
+            relayout_data,
             race_histogram,
             barchart_config,
             county_top_histogram,
