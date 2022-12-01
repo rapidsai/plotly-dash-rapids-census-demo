@@ -22,7 +22,7 @@ The demo consists of six views and all views are calculated at a block level
 - Net Migration view shows total decennial migration. Points are colored into three categories - migrating in, stationary, migrating out
 - Population with Race shows total Census 2020 population colored into seven race categories - White alone, African American alone, American Indian alone, Asian alone, Native Hawaiian alone, Other Race alone, Two or More races.
 
-# Installation and Run Steps
+## Installation and Run Steps
 
 ## Base Layer Setup
 
@@ -59,6 +59,20 @@ cd plotly_demo
 python dask_app.py --cuda_visible_devices=0,1
 ```
 
+## Requirements
+
+### CUDA/GPU requirements
+
+- CUDA 11.0+
+- NVIDIA driver 450.80.02+
+- Pascal architecture or better (Compute Capability >=6.0)
+
+> Recommended Memory: NVIDIA GPU with at least 32GB of memory(or 2 GPUs with equivalent GPU memory when running dask version), and at least 32GB of system memory.
+
+### OS requirements
+
+See the [Rapids System Requirements section](https://rapids.ai/start.html#requirements) for information on compatible OS.
+
 ## Dependencies
 
 - python=3.9
@@ -73,7 +87,7 @@ python dask_app.py --cuda_visible_devices=0,1
 
 ## FAQ and Known Issues
 
-**What hardware do I need to run this locally?** To run you need an NVIDIA GPU with at least 24GB of memory, at least 32GB of system memory, and a Linux OS as defined in the [RAPIDS requirements](https://rapids.ai/start.html#req).
+**What hardware do I need to run this locally?** To run you need an NVIDIA GPU with at least 32GB of memory(or 2 GPUs with equivalent GPU memory when running dask version), at least 32GB of system memory.
 
 **How did you compute migration?** Migration was computed by comparing the block level population for census 2010 and 2020
 
