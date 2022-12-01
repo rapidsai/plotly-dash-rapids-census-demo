@@ -54,9 +54,9 @@ source activate plotly_env
 cd plotly_demo
 python app.py
 
-# run and access multi GPU version
+# run and access multi GPU version, run `python dask_app.py --help for args info`
 cd plotly_demo
-python dask_app.py
+python dask_app.py --cuda_visible_devices=0,1
 ```
 
 ## Dependencies

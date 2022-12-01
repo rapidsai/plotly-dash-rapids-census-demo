@@ -13,6 +13,8 @@ from dask import delayed
 from distributed import Client
 from dask_cuda import LocalCUDACluster
 from utils.utils import *
+import argparse
+
 
 # ### Dashboards start here
 text_color = "#cfd8dc"  # Material blue-grey 100
@@ -553,14 +555,14 @@ def register_update_plots_callback(client):
         )
 
 
-def publish_dataset_to_cluster():
+def publish_dataset_to_cluster(cuda_visible_devices):
 
     census_data_url = "https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/total_population_dataset.parquet"
     data_path = "../data/total_population_dataset.parquet"
     check_dataset(census_data_url, data_path)
 
     # Note: The creation of a Dask LocalCluster must happen inside the `__main__` block,
-    cluster = LocalCUDACluster(CUDA_VISIBLE_DEVICES="0,1")
+    cluster = LocalCUDACluster(CUDA_VISIBLE_DEVICES=cuda_visible_devices)
     client = Client(cluster)
     print(f"Dask status: {cluster.dashboard_link}")
 
@@ -590,8 +592,16 @@ def publish_dataset_to_cluster():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--cuda_visible_devices",
+        help="supply the value of CUDA_VISIBLE_DEVICES as a comma separated string (e.g: --cuda_visible_devices=0,1)",
+        default="0,1",
+    )
+
+    args = parser.parse_args()
     # development entry point
-    publish_dataset_to_cluster()
+    publish_dataset_to_cluster(args.cuda_visible_devices)
 
     # Launch dashboard
     app.run_server(debug=False, dev_tools_silence_routes_logging=True, host="0.0.0.0")
