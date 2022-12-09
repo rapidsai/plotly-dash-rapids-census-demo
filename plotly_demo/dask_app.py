@@ -30,7 +30,7 @@ text_color = "#cfd8dc"  # Material blue-grey 100
     selected_county_bt_backup,
     view_name_backup,
     gpu_enabled_backup,
-    dragmode_backup
+    dragmode_backup,
 ) = ([], [], [], [], None, None, None, None, None, None, "pan")
 
 
@@ -542,7 +542,9 @@ def register_update_plots_callback(client):
             }
         )
         datashader_plot["layout"]["dragmode"] = (
-            relayout_data["dragmode"] if "dragmode" in relayout_data else dragmode_backup
+            relayout_data["dragmode"]
+            if "dragmode" in relayout_data
+            else dragmode_backup
         )
 
         return (
@@ -568,14 +570,14 @@ def register_update_plots_callback(client):
         )
 
 
-def publish_dataset_to_cluster(cuda_visible_devices):
+def publish_dataset_to_cluster():
 
     census_data_url = "https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/total_population_dataset.parquet"
     data_path = "../data/total_population_dataset.parquet"
     check_dataset(census_data_url, data_path)
 
     # Note: The creation of a Dask LocalCluster must happen inside the `__main__` block,
-    cluster = LocalCUDACluster(CUDA_VISIBLE_DEVICES=cuda_visible_devices)
+    cluster = LocalCUDACluster()
     client = Client(cluster)
     print(f"Dask status: {cluster.dashboard_link}")
 
