@@ -238,8 +238,6 @@ def build_datashader_plot(
     temp.data = cp.asnumpy(temp.data)
     n_selected = int(temp)
 
-    print(datashader_color_scale)
-
     if n_selected == 0:
         # Nothing to display
         lat = [None]
@@ -508,15 +506,13 @@ def build_histogram_default_bins(
     else:
         df = df[[column, "net"]].groupby(column)["net"].count()
 
-    print("Grouping done")
-
     df = df.sort_values(ascending=False)  # sorted grouped ids by counts
 
     if (flag == "top") | (flag == "bottom"):
         if flag == "top":
-            view = df[:15]
+            view = df.iloc[:15]
         else:
-            view = df[-15:]
+            view = df.iloc[-15:]
         names = [id2county[cid] for cid in view.index.values]
     else:
         view = df
@@ -564,8 +560,6 @@ def build_histogram_default_bins(
     else:  # net
         bar_color = "#2C718E"
         bar_scale = None
-
-    # print(bar_scale)
 
     fig = {
         "data": [
@@ -697,8 +691,6 @@ def build_updated_figures_dask(
         [coordinates_4326[0][0], coordinates_4326[0][1]],
     ]
 
-    # print(new_coordinates)
-
     x_range, y_range = zip(*coordinates_3857)
     x0, x1 = x_range
     y0, y1 = y_range
@@ -781,8 +773,6 @@ def build_updated_figures_dask(
         },
     }
 
-    # print("DATASHADER done")
-
     race_histogram = build_histogram_default_bins(
         df,
         "race",
@@ -794,9 +784,6 @@ def build_updated_figures_dask(
         flag="All",
     )
 
-    # # print("RACE done")
-
-    # # print("INSIDE UPDATE")
     county_top_histogram = build_histogram_default_bins(
         df,
         "county",
@@ -808,8 +795,6 @@ def build_updated_figures_dask(
         flag="top",
     )
 
-    # # print("COUNTY TOP done")
-
     county_bottom_histogram = build_histogram_default_bins(
         df,
         "county",
@@ -820,8 +805,6 @@ def build_updated_figures_dask(
         view_name,
         flag="bottom",
     )
-
-    # print("COUNTY BOTTOM done")
 
     del df
     return (
@@ -920,8 +903,6 @@ def build_updated_figures(
         [coordinates_4326[0][0], coordinates_4326[0][1]],
     ]
 
-    # print(new_coordinates)
-
     x_range, y_range = zip(*coordinates_3857)
     x0, x1 = x_range
     y0, y1 = y_range
@@ -935,7 +916,6 @@ def build_updated_figures(
         df = query_df_range_lat_lon(df, x0, x1, y0, y1, "easting", "northing")
 
     # Select points as per view
-
     if (view_name == "total") | (view_name == "race"):
         df = df[(df["net"] == 0) | (df["net"] == 1)]
         df["net"] = df["net"].astype("int8")
@@ -1000,8 +980,6 @@ def build_updated_figures(
         },
     }
 
-    # print("DATASHADER done")
-
     race_histogram = build_histogram_default_bins(
         df,
         "race",
@@ -1013,9 +991,6 @@ def build_updated_figures(
         flag="All",
     )
 
-    # # print("RACE done")
-
-    # # print("INSIDE UPDATE")
     county_top_histogram = build_histogram_default_bins(
         df,
         "county",
@@ -1027,8 +1002,6 @@ def build_updated_figures(
         flag="top",
     )
 
-    # # print("COUNTY TOP done")
-
     county_bottom_histogram = build_histogram_default_bins(
         df,
         "county",
@@ -1039,8 +1012,6 @@ def build_updated_figures(
         view_name,
         flag="bottom",
     )
-
-    # print("COUNTY BOTTOM done")
 
     del df
     return (
@@ -1061,7 +1032,7 @@ def check_dataset(dataset_url, data_path):
             f"Downloading from {dataset_url}"
         )
         # Download dataset to data directory
-        os.makedirs("./data", exist_ok=True)
+        os.makedirs("../data", exist_ok=True)
         with requests.get(dataset_url, stream=True) as r:
             r.raise_for_status()
             with open(data_path, "wb") as f:
@@ -1086,4 +1057,6 @@ def load_dataset(path, dtype="dask_cudf"):
         return dd.read_parquet(path, split_row_groups=True)
     elif dtype == "dask_cudf":
         return dask_cudf.read_parquet(path, split_row_groups=True)
+    elif dtype == "pandas":
+        return cudf.read_parquet(path).to_pandas()
     return cudf.read_parquet(path)
