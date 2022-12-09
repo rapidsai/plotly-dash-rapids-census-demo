@@ -172,7 +172,7 @@ app.layout = html.Div(
                                                         "value": "race",
                                                     },
                                                 ],
-                                                value="total",
+                                                value="in",
                                                 searchable=False,
                                                 clearable=False,
                                             ),

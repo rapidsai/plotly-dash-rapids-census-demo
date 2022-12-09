@@ -168,7 +168,7 @@ app.layout = html.Div(
                                                         "value": "race",
                                                     },
                                                 ],
-                                                value="total",
+                                                value="in",
                                                 searchable=False,
                                                 clearable=False,
                                             ),
@@ -535,7 +535,9 @@ def register_update_plots_callback():
         )
 
         datashader_plot["layout"]["dragmode"] = (
-            relayout_data["dragmode"] if "dragmode" in relayout_data else dragmode_backup
+            relayout_data["dragmode"]
+            if "dragmode" in relayout_data
+            else dragmode_backup
         )
         return (
             n_selected_indicator,
