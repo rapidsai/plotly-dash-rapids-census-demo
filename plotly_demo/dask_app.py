@@ -616,7 +616,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     # development entry point
-    publish_dataset_to_cluster(args.cuda_visible_devices)
+    publish_dataset_to_cluster()
 
     # Launch dashboard
     app.run_server(debug=False, dev_tools_silence_routes_logging=True, host="0.0.0.0")
