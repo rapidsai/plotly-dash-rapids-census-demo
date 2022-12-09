@@ -570,16 +570,11 @@ def register_update_plots_callback(client):
         )
 
 
-def publish_dataset_to_cluster():
+def publish_dataset_to_cluster(client):
 
     census_data_url = "https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/total_population_dataset.parquet"
     data_path = "../data/total_population_dataset.parquet"
     check_dataset(census_data_url, data_path)
-
-    # Note: The creation of a Dask LocalCluster must happen inside the `__main__` block,
-    cluster = LocalCUDACluster()
-    client = Client(cluster)
-    print(f"Dask status: {cluster.dashboard_link}")
 
     # Load dataset and persist dataset on cluster
     def load_and_publish_dataset():
@@ -615,8 +610,12 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    # Note: The creation of a Dask LocalCluster must happen inside the `__main__` block,
+    cluster = LocalCUDACluster()
+    client = Client(cluster)
+    print(f"Dask status: {cluster.dashboard_link}")
     # development entry point
-    publish_dataset_to_cluster()
+    publish_dataset_to_cluster(client)
 
     # Launch dashboard
     app.run_server(debug=False, dev_tools_silence_routes_logging=True, host="0.0.0.0")
