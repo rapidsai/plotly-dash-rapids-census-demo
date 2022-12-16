@@ -77,7 +77,7 @@ docker build -t plotly_demo .
 docker run --gpus all -d --name single_gpu -p 8050:8050 plotly_demo
 
 # run and access multi GPU version via: http://localhost:8050 / http://ip_address:8050 / http://0.0.0.0:8050
-# if `device` argument is not passed, all the available GPUs are used
+# Use `--gpus all` to use all the available GPUs
 docker run --gpus '"device=0,1"' -d --name multi_gpu -p 8050:8050 plotly_demo dask_app
 ```
 
