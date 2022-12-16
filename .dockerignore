@@ -1,0 +1,3 @@
+./data/*
+dask-worker-space
+.vscode

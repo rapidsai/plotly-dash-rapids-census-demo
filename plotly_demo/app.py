@@ -321,7 +321,7 @@ app.layout = html.Div(
                 ),
                 dcc.Markdown(
                     """\
-- 2010 Population Census and 2020 Population Census Datasets.
+- 2020 Population Census and 2010 Population Census to compute Migration Dataset, used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](https://www.nhgis.org/) ( not for redistribution ).
 - Base map layer provided by [Mapbox](https://www.mapbox.com/).
 - Dashboard developed with [Plotly Dash](https://plotly.com/dash/).
 - Geospatial point rendering developed with [Datashader](https://datashader.org/).
@@ -429,7 +429,6 @@ def register_update_plots_callback():
         *backup_args,
     ):
         global data_3857, data_center_3857, data_4326, data_center_4326, selected_map_backup, selected_race_backup, selected_county_top_backup, selected_county_bt_backup, view_name_backup, c_df, gpu_enabled_backup, dragmode_backup
-        print(backup_args[2])
         # condition to avoid reloading on tool update
         if (
             type(relayout_data) == dict
@@ -536,7 +535,7 @@ def register_update_plots_callback():
 
         datashader_plot["layout"]["dragmode"] = (
             relayout_data["dragmode"]
-            if "dragmode" in relayout_data
+            if (relayout_data and "dragmode" in relayout_data)
             else dragmode_backup
         )
         return (

@@ -55,8 +55,30 @@ cd plotly_demo
 python app.py
 
 # run and access multi GPU version, run `python dask_app.py --help for args info`
+# if --cuda_visible_devices argument is not passed, all the available GPUs are used
 cd plotly_demo
 python dask_app.py --cuda_visible_devices=0,1
+```
+
+### Docker
+
+Verify the following arguments in the Dockerfile match your system:
+
+1. CUDA_VERSION: Supported versions are `11.0+`
+2. LINUX_VERSION: Supported OS values are `ubuntu16.04, ubuntu18.04, centos7`
+
+The most up to date OS and CUDA versions supported can be found here: [RAPIDS requirements](https://rapids.ai/start.html#req)
+
+```bash
+# build
+docker buildx build -t plotly_demo .
+
+# run and access single GPU version via: http://localhost:8050 / http://ip_address:8050 / http://0.0.0.0:8050
+docker run --gpus all -d --name single_gpu -p 8050:8050 plotly_demo
+
+# run and access multi GPU version via: http://localhost:8050 / http://ip_address:8050 / http://0.0.0.0:8050
+# if `device` argument is not passed, all the available GPUs are used
+docker run --gpus '"device=0,1"' -d --name multi_gpu -p 8050:8050 plotly_demo dask_app
 ```
 
 ## Requirements

@@ -325,7 +325,7 @@ app.layout = html.Div(
                 ),
                 dcc.Markdown(
                     """\
-- 2010 Population Census and 2020 Population Census Datasets.
+- 2020 Population Census and 2010 Population Census to compute Migration Dataset, used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](https://www.nhgis.org/) ( not for redistribution ).
 - Base map layer provided by [Mapbox](https://www.mapbox.com/).
 - Dashboard developed with [Plotly Dash](https://plotly.com/dash/).
 - Geospatial point rendering developed with [Datashader](https://datashader.org/).
@@ -543,7 +543,7 @@ def register_update_plots_callback(client):
         )
         datashader_plot["layout"]["dragmode"] = (
             relayout_data["dragmode"]
-            if "dragmode" in relayout_data
+            if (relayout_data and "dragmode" in relayout_data)
             else dragmode_backup
         )
 
@@ -577,7 +577,11 @@ def publish_dataset_to_cluster(cuda_visible_devices):
     check_dataset(census_data_url, data_path)
 
     # Note: The creation of a Dask LocalCluster must happen inside the `__main__` block,
-    cluster = LocalCUDACluster(CUDA_VISIBLE_DEVICES=cuda_visible_devices)
+    cluster = (
+        LocalCUDACluster(CUDA_VISIBLE_DEVICES=cuda_visible_devices)
+        if cuda_visible_devices
+        else LocalCUDACluster()
+    )
     client = Client(cluster)
     print(f"Dask status: {cluster.dashboard_link}")
 
@@ -610,8 +614,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--cuda_visible_devices",
-        help="supply the value of CUDA_VISIBLE_DEVICES as a comma separated string (e.g: --cuda_visible_devices=0,1)",
-        default="0,1",
+        help="supply the value of CUDA_VISIBLE_DEVICES as a comma separated string (e.g: --cuda_visible_devices=0,1), if None, all the available GPUs are used",
+        default=None,
     )
 
     args = parser.parse_args()
