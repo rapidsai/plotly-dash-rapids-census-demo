@@ -71,7 +71,7 @@ The most up to date OS and CUDA versions supported can be found here: [RAPIDS re
 
 ```bash
 # build
-docker buildx build -t plotly_demo .
+docker build -t plotly_demo .
 
 # run and access single GPU version via: http://localhost:8050 / http://ip_address:8050 / http://0.0.0.0:8050
 docker run --gpus all -d --name single_gpu -p 8050:8050 plotly_demo

@@ -16,6 +16,6 @@ WORKDIR /rapids/plotly_census_demo
 
 COPY . .
 
-RUN --mount=type=cache,target=/opt/conda/pkgs mamba env create --name plotly_env --file environment.yml
+RUN mamba env create --name plotly_env --file environment.yml
 
 ENTRYPOINT ["bash","./entrypoint.sh"]
