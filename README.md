@@ -74,11 +74,11 @@ The most up to date OS and CUDA versions supported can be found here: [RAPIDS re
 docker build -t plotly_demo .
 
 # run and access single GPU version via: http://localhost:8050 / http://ip_address:8050 / http://0.0.0.0:8050
-docker run --gpus all -d --name single_gpu -p 8050:8050 plotly_demo
+docker run --gpus all --name single_gpu -p 8050:8050 plotly_demo
 
 # run and access multi GPU version via: http://localhost:8050 / http://ip_address:8050 / http://0.0.0.0:8050
 # Use `--gpus all` to use all the available GPUs
-docker run --gpus '"device=0,1"' -d --name multi_gpu -p 8050:8050 plotly_demo dask_app
+docker run --gpus '"device=0,1"' --name multi_gpu -p 8050:8050 plotly_demo dask_app
 ```
 
 ## Requirements
