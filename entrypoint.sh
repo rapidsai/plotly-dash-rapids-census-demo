@@ -1,5 +1,5 @@
 #activating the conda environment
-source activate plotly_env
+source activate rapids
 
 cd /rapids/plotly_census_demo/plotly_demo
 

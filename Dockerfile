@@ -16,6 +16,6 @@ WORKDIR /rapids/plotly_census_demo
 
 COPY . .
 
-RUN mamba env create --name plotly_env --file environment.yml
+RUN source activate rapids && conda remove --force cuxfilter && mamba env update --file environment.yml
 
 ENTRYPOINT ["bash","./entrypoint.sh"]
