@@ -36,4 +36,4 @@ Mappings for counties can be found in `id2county.pkl` file from root directory.
 
 ### Final Dataset
 
-You can download the final net miragtion dataset [here](https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/net_migration_dataset.parquet)
+You can download the final net miragtion dataset [here](https://data.rapids.ai/viz-data/net_migration_dataset.parquet)

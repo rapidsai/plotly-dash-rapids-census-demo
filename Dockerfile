@@ -10,7 +10,7 @@ RUN mkdir plotly_census_demo
 WORKDIR /rapids/plotly_census_demo
 RUN mkdir data
 WORKDIR /rapids/plotly_census_demo/data
-RUN curl https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/total_population_dataset.parquet -o total_population_dataset.parquet
+RUN curl https://data.rapids.ai/viz-data/total_population_dataset.parquet -o total_population_dataset.parquet
 
 WORKDIR /rapids/plotly_census_demo
 
