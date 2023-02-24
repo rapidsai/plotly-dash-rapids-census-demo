@@ -562,7 +562,7 @@ def register_update_plots_callback():
 
 def read_dataset():
     global c_df
-    census_data_url = "https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/total_population_dataset.parquet"
+    census_data_url = "https://data.rapids.ai/viz-data/total_population_dataset.parquet"
     data_path = "../data/total_population_dataset.parquet"
     check_dataset(census_data_url, data_path)
     # cudf DataFrame
