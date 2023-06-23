@@ -45,7 +45,7 @@ colors["net"] = {
 
 
 # Figure template
-row_heights = [150, 440, 250, 75]
+row_heights = [150, 440, 300, 75]
 template = {
     "layout": {
         "paper_bgcolor": bgcolor,
@@ -191,6 +191,7 @@ def build_datashader_plot(
 
     colorscale_transform = "linear"
 
+    print(df)
     if view_name == "race":
         aggregate_column = "race"
         aggregate = "mean"
@@ -246,7 +247,6 @@ def build_datashader_plot(
         marker = {}
         layers = []
     else:
-
         img = tf.shade(
             tf.dynspread(agg, threshold=0.7),
             **datashader_color_scale,
@@ -275,7 +275,7 @@ def build_datashader_plot(
         "layout": {
             "template": template,
             "uirevision": True,
-            "zoom": 10,
+            "zoom": 3,
             "mapbox": {
                 "style": mapbox_style,
                 "accesstoken": token,
@@ -286,7 +286,7 @@ def build_datashader_plot(
                 },
             },
             "margin": {"r": 140, "t": 0, "l": 0, "b": 0},
-            "height": 700,
+            "height": 500,
             "shapes": [
                 {
                     "type": "rect",
@@ -445,7 +445,6 @@ def query_df_range_lat_lon(df, x0, x1, y0, y1, x, y):
 
 
 def bar_selected_ids(selection, column):  # select ids for each column
-
     if (column == "county_top") | (column == "county_bottom"):
         selected_ids = [county2id[p["label"]] for p in selection["points"]]
     else:
@@ -488,7 +487,6 @@ def build_histogram_default_bins(
     view_name,
     flag,
 ):
-
     if (view_name == "out") & (column == "race"):
         return no_data_figure()
 
@@ -744,17 +742,6 @@ def build_updated_figures_dask(
     n_selected_indicator = {
         "data": [
             {
-                "domain": {"x": [0.31, 0.41], "y": [0, 0.5]},
-                "title": {"text": "Query Result"},
-                "type": "indicator",
-                "value": len(df),
-                "number": {
-                    "font": {"color": text_color, "size": "50px"},
-                    "valueformat": ",",
-                    "suffix": " people",
-                },
-            },
-            {
                 "domain": {"x": [0.71, 0.81], "y": [0, 0.5]},
                 "title": {"text": "Data Size"},
                 "type": "indicator",
@@ -834,7 +821,6 @@ def build_updated_figures(
     position_backup,
     view_name,
 ):
-
     colorscale_transform = "linear"
     selected = {}
 
@@ -950,17 +936,6 @@ def build_updated_figures(
     # Build indicator figure
     n_selected_indicator = {
         "data": [
-            {
-                "domain": {"x": [0.31, 0.41], "y": [0, 0.5]},
-                "title": {"text": "Query Result"},
-                "type": "indicator",
-                "value": len(df),
-                "number": {
-                    "font": {"color": text_color, "size": "50px"},
-                    "valueformat": ",",
-                    "suffix": " people",
-                },
-            },
             {
                 "domain": {"x": [0.71, 0.81], "y": [0, 0.5]},
                 "title": {"text": "Data Size"},
