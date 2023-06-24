@@ -191,7 +191,6 @@ def build_datashader_plot(
 
     colorscale_transform = "linear"
 
-    print(df)
     if view_name == "race":
         aggregate_column = "race"
         aggregate = "mean"
@@ -742,7 +741,7 @@ def build_updated_figures_dask(
     n_selected_indicator = {
         "data": [
             {
-                "domain": {"x": [0.71, 0.81], "y": [0, 0.5]},
+                "domain": {"x": [0.21, 0.41], "y": [0, 0.5]},
                 "title": {"text": "Data Size"},
                 "type": "indicator",
                 "value": len(df),
@@ -937,7 +936,7 @@ def build_updated_figures(
     n_selected_indicator = {
         "data": [
             {
-                "domain": {"x": [0.71, 0.81], "y": [0, 0.5]},
+                "domain": {"x": [0.2, 0.45], "y": [0, 0.5]},
                 "title": {"text": "Data Size"},
                 "type": "indicator",
                 "value": len(df),

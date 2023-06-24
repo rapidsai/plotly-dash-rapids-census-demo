@@ -23,6 +23,7 @@ DATA_PATH_STATE = f"{DATA_PATH}/state-wise-population"
 state_files = os.listdir(DATA_PATH_STATE)
 state_names = [os.path.splitext(f)[0] for f in state_files]
 
+DEFAULT_STATE = state_names[0]
 # append USA to state_names
 state_names.append("USA")
 
@@ -39,13 +40,11 @@ state_names.append("USA")
     c_df,
     gpu_enabled_backup,
     dragmode_backup,
-) = ([], [], [], [], None, None, None, None, None, None, None, "pan")
+    currently_loaded_state,
+) = ([], [], [], [], None, None, None, None, None, None, None, "pan", None)
 
 
-app = dash.Dash(
-    __name__,
-    external_stylesheets=["assets/s1.css"],
-)
+app = dash.Dash(__name__)
 app.layout = html.Div(
     children=[
         html.Div(
@@ -169,8 +168,6 @@ app.layout = html.Div(
                                                             for i in state_names
                                                         ],
                                                         value="CALIFORNIA",
-                                                        searchable=False,
-                                                        clearable=False,
                                                     ),
                                                     style={
                                                         "width": "25%",
@@ -345,12 +342,11 @@ app.layout = html.Div(
                 html.H4("Acknowledgements and Data Sources", style={"marginTop": "0"}),
                 dcc.Markdown(
                     """\
-**Important Data Caveats:** Geospatially filtered data will show accurate distribution, but due to anonymized, multiple cross filtered distributions will not return meaningful results. See [FAQ](https://github.com/rapidsai/plotly-dash-rapids-census-demo/tree/master#faq-and-known-issues) fore details.
-- 2010 Population Census and 2018 ACS data used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](https://www.nhgis.org/) ( not for redistribution ).
+- 2020 Population Census and 2010 Population Census to compute Migration Dataset, used with permission from IPUMS NHGIS, University of Minnesota, [www.nhgis.org](https://www.nhgis.org/) ( not for redistribution ).
 - Base map layer provided by [Mapbox](https://www.mapbox.com/).
-- Dashboard developed with [Plot.ly Dash](https://plotly.com/dash/).
+- Dashboard developed with [Plotly Dash](https://plotly.com/dash/).
 - Geospatial point rendering developed with [Datashader](https://datashader.org/).
-- GPU toggle accelerated with [RAPIDS cudf](https://rapids.ai/) and [cupy](https://cupy.chainer.org/), CPU toggle with [pandas](https://pandas.pydata.org/).
+- GPU toggle accelerated with [RAPIDS cudf and dask_cudf](https://rapids.ai/) and [cupy](https://cupy.chainer.org/), CPU toggle with [pandas](https://pandas.pydata.org/).
 - For source code and data workflow, visit our [GitHub](https://github.com/rapidsai/plotly-dash-rapids-census-demo/tree/master).
 """
                 ),
@@ -460,7 +456,9 @@ def register_update_plots_callback():
         coordinates_backup,
         *backup_args,
     ):
-        global data_3857, data_center_3857, data_4326, data_center_4326, selected_map_backup, selected_race_backup, selected_county_top_backup, selected_county_bt_backup, view_name_backup, c_df, gpu_enabled_backup, dragmode_backup
+        global data_3857, data_center_3857, data_4326, data_center_4326, selected_map_backup, selected_race_backup, selected_county_top_backup, selected_county_bt_backup, view_name_backup, c_df, gpu_enabled_backup, dragmode_backup, currently_loaded_state
+
+        df = read_dataset(state_name, gpu_enabled, currently_loaded_state)
         # condition to avoid reloading on tool update
         if (
             type(relayout_data) == dict
@@ -490,20 +488,9 @@ def register_update_plots_callback():
         else:
             coordinates_4326_backup, position_backup = None, None
 
-        if state_name == "USA":
-            c_df = load_dataset(f"{DATA_PATH}/total_population_dataset.parquet", "cudf")
-        else:
-            c_df = load_dataset(f"{DATA_PATH_STATE}/{state_name}.parquet", "cudf")
-
-        # Get dataset from client
-        if gpu_enabled:
-            df = c_df
-        else:
-            df = c_df.to_pandas()
-
         colorscale_name = "Viridis"
 
-        if data_3857 == []:
+        if data_3857 == [] or state_name != currently_loaded_state:
             (
                 data_3857,
                 data_center_3857,
@@ -558,7 +545,7 @@ def register_update_plots_callback():
                 "title": {"text": "Query Time"},
                 "type": "indicator",
                 "value": round(compute_time, 4),
-                "domain": {"x": [0.53, 0.61], "y": [0, 0.5]},
+                "domain": {"x": [0.6, 0.85], "y": [0, 0.5]},
                 "number": {
                     "font": {
                         "color": text_color,
@@ -574,6 +561,9 @@ def register_update_plots_callback():
             if (relayout_data and "dragmode" in relayout_data)
             else dragmode_backup
         )
+        # update currently loaded state
+        currently_loaded_state = state_name
+
         return (
             n_selected_indicator,
             datashader_plot,
@@ -596,24 +586,20 @@ def register_update_plots_callback():
         )
 
 
-def read_dataset():
-    # global c_df
-    # census_data_url = "https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/total_population_dataset.parquet"
-    # data_path = "../data/state-wise-population/California.parquet"
-    # get file names as a list from the `../data/state-wise-population` directory and remove extension from the file names
-    # file_names = [f.split(".")[0] for f in os.listdir("../data/state-wise-population")]
-    # print(file_names)
-    # check_dataset(census_data_url, data_path)
-    # cudf DataFrame
-    # c_df = load_dataset(data_path, "cudf")
-
-    # Register top-level callback that updates plots
-    register_update_plots_callback()
+def read_dataset(state_name, gpu_enabled, currently_loaded_state):
+    global c_df
+    if state_name != currently_loaded_state:
+        if state_name == "USA":
+            data_path = f"{DATA_PATH}/total_population_dataset.parquet"
+        else:
+            data_path = f"{DATA_PATH_STATE}/{state_name}.parquet"
+        c_df = load_dataset(data_path, "cudf" if gpu_enabled else "pandas")
+    return c_df
 
 
 if __name__ == "__main__":
     # development entry point
-    read_dataset()
+    register_update_plots_callback()
 
     # Launch dashboard
     app.run_server(
