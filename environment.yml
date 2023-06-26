@@ -10,6 +10,8 @@ dependencies:
   - dask-cuda=23.06
   - dash
   - jupyterlab
+  - jupyter-dash
+  - jupyterlab-dash
   - dash-html-components
   - dash-core-components
   - dash-daq
