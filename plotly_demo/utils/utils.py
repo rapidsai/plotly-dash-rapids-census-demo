@@ -581,10 +581,8 @@ def build_histogram_default_bins(
             "hovermode": "closest",
         },
     }
-
     if column not in selections:
-        for i in range(len(fig["data"])):
-            fig["data"][i]["selectedpoints"] = False
+        fig["data"][0]["selectedpoints"] = False
 
     return fig
 
@@ -990,9 +988,9 @@ def build_updated_figures(
     del df
     return (
         datashader_plot,
+        race_histogram,
         county_top_histogram,
         county_bottom_histogram,
-        race_histogram,
         n_selected_indicator,
         coordinates_4326_backup,
         position_backup,

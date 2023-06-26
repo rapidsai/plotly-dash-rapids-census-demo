@@ -1,17 +1,16 @@
-import pandas as pd
+import os
+import time
+
 import cudf
-from dash import dcc, html
+import dash_bootstrap_components as dbc
+import dash_daq as daq
 import numpy as np
 import pandas as pd
+from dash import Dash, ctx, dcc, html
 from dash.dependencies import Input, Output, State
-from dash import dcc
-import dash_bootstrap_components as dbc
-import time
-import dash_daq as daq
-import dash
+from dash.exceptions import PreventUpdate
 from distributed import Client
 from utils import *
-import os
 
 # ### Dashboards start here
 text_color = "#cfd8dc"  # Material blue-grey 100
@@ -44,7 +43,9 @@ state_names.append("USA")
 ) = ([], [], [], [], None, None, None, None, None, None, None, "pan", None)
 
 
-app = dash.Dash(__name__)
+app = Dash(__name__)
+application = app.server
+
 app.layout = html.Div(
     children=[
         html.Div(
@@ -167,7 +168,7 @@ app.layout = html.Div(
                                                             {"label": i, "value": i}
                                                             for i in state_names
                                                         ],
-                                                        value="CALIFORNIA",
+                                                        value="DELAWARE",
                                                     ),
                                                     style={
                                                         "width": "25%",
@@ -279,7 +280,6 @@ app.layout = html.Div(
                             id="race-histogram",
                             config={"displayModeBar": False},
                             figure=blank_fig(row_heights[2]),
-                            animate=False,
                         ),
                     ],
                     className="four columns pretty_container",
@@ -363,8 +363,6 @@ app.layout = html.Div(
 
 
 # Clear/reset button callbacks
-
-
 @app.callback(
     Output("map-graph", "selectedData"),
     [Input("reset-map", "n_clicks"), Input("clear-all", "n_clicks")],
@@ -397,193 +395,182 @@ def clear_county_hist_bottom_selections(*args):
     return None
 
 
-# # Query string helpers
+@app.callback(
+    [
+        Output("indicator-graph", "figure"),
+        Output("map-graph", "figure"),
+        Output("map-graph", "config"),
+        Output("county-histogram-top", "figure"),
+        Output("county-histogram-top", "config"),
+        Output("county-histogram-bottom", "figure"),
+        Output("county-histogram-bottom", "config"),
+        Output("race-histogram", "figure"),
+        Output("race-histogram", "config"),
+        Output("intermediate-state-value", "children"),
+    ],
+    [
+        Input("map-graph", "relayoutData"),
+        Input("map-graph", "selectedData"),
+        Input("race-histogram", "selectedData"),
+        Input("county-histogram-top", "selectedData"),
+        Input("county-histogram-bottom", "selectedData"),
+        Input("view-dropdown", "value"),
+        Input("state-dropdown", "value"),
+        Input("gpu-toggle", "on"),
+    ],
+    [
+        State("intermediate-state-value", "children"),
+    ],
+)
+def update_plots(
+    relayout_data,
+    selected_map,
+    selected_race,
+    selected_county_top,
+    selected_county_bottom,
+    view_name,
+    state_name,
+    gpu_enabled,
+    coordinates_backup,
+):
+    global data_3857, data_center_3857, data_4326, data_center_4326, currently_loaded_state, selected_race_backup, selected_county_top_backup, selected_county_bt_backup
 
-
-def register_update_plots_callback():
-    """
-    Register Dash callback that updates all plots in response to selection events
-    Args:
-        df_d: Dask.delayed pandas or cudf DataFrame
-    """
-
-    @app.callback(
-        [
-            Output("indicator-graph", "figure"),
-            Output("map-graph", "figure"),
-            Output("map-graph", "config"),
-            Output("county-histogram-top", "figure"),
-            Output("county-histogram-top", "config"),
-            Output("county-histogram-bottom", "figure"),
-            Output("county-histogram-bottom", "config"),
-            Output("race-histogram", "figure"),
-            Output("race-histogram", "config"),
-            Output("intermediate-state-value", "children"),
-        ],
-        [
-            Input("map-graph", "relayoutData"),
-            Input("map-graph", "selectedData"),
-            Input("race-histogram", "selectedData"),
-            Input("county-histogram-top", "selectedData"),
-            Input("county-histogram-bottom", "selectedData"),
-            Input("view-dropdown", "value"),
-            Input("state-dropdown", "value"),
-            Input("gpu-toggle", "on"),
-        ],
-        [
-            State("intermediate-state-value", "children"),
-            State("indicator-graph", "figure"),
-            State("map-graph", "figure"),
-            State("map-graph", "config"),
-            State("county-histogram-top", "figure"),
-            State("county-histogram-top", "config"),
-            State("county-histogram-bottom", "figure"),
-            State("county-histogram-bottom", "config"),
-            State("race-histogram", "figure"),
-            State("race-histogram", "config"),
-            State("intermediate-state-value", "children"),
-        ],
-    )
-    def update_plots(
-        relayout_data,
-        selected_map,
-        selected_race,
-        selected_county_top,
-        selected_county_bottom,
-        view_name,
-        state_name,
-        gpu_enabled,
-        coordinates_backup,
-        *backup_args,
+    # condition to avoid reloading on tool update
+    if (
+        ctx.triggered_id == "map-graph"
+        and relayout_data
+        and list(relayout_data.keys()) == ["dragmode"]
     ):
-        global data_3857, data_center_3857, data_4326, data_center_4326, selected_map_backup, selected_race_backup, selected_county_top_backup, selected_county_bt_backup, view_name_backup, c_df, gpu_enabled_backup, dragmode_backup, currently_loaded_state
+        raise PreventUpdate
 
-        df = read_dataset(state_name, gpu_enabled, currently_loaded_state)
-        # condition to avoid reloading on tool update
-        if (
-            type(relayout_data) == dict
-            and list(relayout_data.keys()) == ["dragmode"]
-            and selected_map == selected_map_backup
-            and selected_race_backup == selected_race
-            and selected_county_top_backup == selected_county_top
-            and selected_county_bt_backup == selected_county_bottom
-            and view_name_backup == view_name
-            and gpu_enabled_backup == gpu_enabled
-        ):
-            backup_args[1]["layout"]["dragmode"] = relayout_data["dragmode"]
-            dragmode_backup = relayout_data["dragmode"]
-            return backup_args
-
-        selected_map_backup = selected_map
+    # condition to avoid a bug in plotly where selectedData is reset following a box-select
+    if not (selected_race is not None and len(selected_race["points"]) == 0):
         selected_race_backup = selected_race
+    elif ctx.triggered_id == "race-histogram":
+        raise PreventUpdate
+
+    # condition to avoid a bug in plotly where selectedData is reset following a box-select
+    if not (
+        selected_county_top is not None and len(selected_county_top["points"]) == 0
+    ):
         selected_county_top_backup = selected_county_top
+    elif ctx.triggered_id == "county-histogram-top":
+        raise PreventUpdate
+
+    # condition to avoid a bug in plotly where selectedData is reset following a box-select
+    if not (
+        selected_county_bottom is not None
+        and len(selected_county_bottom["points"]) == 0
+    ):
         selected_county_bt_backup = selected_county_bottom
-        view_name_backup = view_name
-        gpu_enabled_backup = gpu_enabled
+    elif ctx.triggered_id == "county-histogram-bottom":
+        raise PreventUpdate
 
-        t0 = time.time()
+    df = read_dataset(state_name, gpu_enabled, currently_loaded_state)
 
-        if coordinates_backup is not None:
-            coordinates_4326_backup, position_backup = coordinates_backup
-        else:
-            coordinates_4326_backup, position_backup = None, None
+    t0 = time.time()
 
-        colorscale_name = "Viridis"
+    if coordinates_backup is not None:
+        coordinates_4326_backup, position_backup = coordinates_backup
+    else:
+        coordinates_4326_backup, position_backup = None, None
 
-        if data_3857 == [] or state_name != currently_loaded_state:
-            (
-                data_3857,
-                data_center_3857,
-                data_4326,
-                data_center_4326,
-            ) = set_projection_bounds(df)
+    colorscale_name = "Viridis"
 
+    if data_3857 == [] or state_name != currently_loaded_state:
         (
-            datashader_plot,
-            race_histogram,
-            county_top_histogram,
-            county_bottom_histogram,
-            n_selected_indicator,
-            coordinates_4326_backup,
-            position_backup,
-        ) = build_updated_figures(
-            df,
-            relayout_data,
-            selected_map,
-            selected_race,
-            selected_county_top,
-            selected_county_bottom,
-            colorscale_name,
             data_3857,
             data_center_3857,
             data_4326,
             data_center_4326,
-            coordinates_4326_backup,
-            position_backup,
-            view_name,
-        )
+        ) = set_projection_bounds(df)
 
-        barchart_config = {
+    (
+        datashader_plot,
+        race_histogram,
+        county_top_histogram,
+        county_bottom_histogram,
+        n_selected_indicator,
+        coordinates_4326_backup,
+        position_backup,
+    ) = build_updated_figures(
+        df,
+        relayout_data,
+        selected_map,
+        selected_race_backup,
+        selected_county_top_backup,
+        selected_county_bt_backup,
+        colorscale_name,
+        data_3857,
+        data_center_3857,
+        data_4326,
+        data_center_4326,
+        coordinates_4326_backup,
+        position_backup,
+        view_name,
+    )
+
+    barchart_config = {
+        "displayModeBar": True,
+        "modeBarButtonsToRemove": [
+            "zoom2d",
+            "pan2d",
+            "select2d",
+            "lasso2d",
+            "zoomIn2d",
+            "zoomOut2d",
+            "resetScale2d",
+            "hoverClosestCartesian",
+            "hoverCompareCartesian",
+            "toggleSpikelines",
+        ],
+    }
+    compute_time = time.time() - t0
+    print(f"Query time: {compute_time}")
+    n_selected_indicator["data"].append(
+        {
+            "title": {"text": "Query Time"},
+            "type": "indicator",
+            "value": round(compute_time, 4),
+            "domain": {"x": [0.6, 0.85], "y": [0, 0.5]},
+            "number": {
+                "font": {
+                    "color": text_color,
+                    "size": "50px",
+                },
+                "suffix": " seconds",
+            },
+        }
+    )
+
+    datashader_plot["layout"]["dragmode"] = (
+        relayout_data["dragmode"]
+        if (relayout_data and "dragmode" in relayout_data)
+        else dragmode_backup
+    )
+    # update currently loaded state
+    currently_loaded_state = state_name
+
+    return (
+        n_selected_indicator,
+        datashader_plot,
+        {
             "displayModeBar": True,
             "modeBarButtonsToRemove": [
-                "zoom2d",
-                "pan2d",
-                "select2d",
                 "lasso2d",
-                "zoomIn2d",
-                "zoomOut2d",
-                "resetScale2d",
-                "hoverClosestCartesian",
-                "hoverCompareCartesian",
-                "toggleSpikelines",
+                "zoomInMapbox",
+                "zoomOutMapbox",
+                "toggleHover",
             ],
-        }
-        compute_time = time.time() - t0
-        print(f"Query time: {compute_time}")
-        n_selected_indicator["data"].append(
-            {
-                "title": {"text": "Query Time"},
-                "type": "indicator",
-                "value": round(compute_time, 4),
-                "domain": {"x": [0.6, 0.85], "y": [0, 0.5]},
-                "number": {
-                    "font": {
-                        "color": text_color,
-                        "size": "50px",
-                    },
-                    "suffix": " seconds",
-                },
-            }
-        )
-
-        datashader_plot["layout"]["dragmode"] = (
-            relayout_data["dragmode"]
-            if (relayout_data and "dragmode" in relayout_data)
-            else dragmode_backup
-        )
-        # update currently loaded state
-        currently_loaded_state = state_name
-
-        return (
-            n_selected_indicator,
-            datashader_plot,
-            {
-                "displayModeBar": True,
-                "modeBarButtonsToRemove": [
-                    "lasso2d",
-                    "zoomInMapbox",
-                    "zoomOutMapbox",
-                    "toggleHover",
-                ],
-            },
-            race_histogram,
-            barchart_config,
-            county_top_histogram,
-            barchart_config,
-            county_bottom_histogram,
-            barchart_config,
-            (coordinates_4326_backup, position_backup),
-        )
+        },
+        county_top_histogram,
+        barchart_config,
+        county_bottom_histogram,
+        barchart_config,
+        race_histogram,
+        barchart_config,
+        (coordinates_4326_backup, position_backup),
+    )
 
 
 def read_dataset(state_name, gpu_enabled, currently_loaded_state):
@@ -598,13 +585,9 @@ def read_dataset(state_name, gpu_enabled, currently_loaded_state):
 
 
 if __name__ == "__main__":
-    # development entry point
-    register_update_plots_callback()
-
     # Launch dashboard
     app.run_server(
         debug=True,
         dev_tools_hot_reload=True,
-        dev_tools_silence_routes_logging=True,
         host="0.0.0.0",
     )
