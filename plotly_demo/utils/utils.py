@@ -1,16 +1,21 @@
-import os
-import requests
-import dask_cudf
-import cudf
 from bokeh import palettes
-import numpy as np
 from pyproj import Transformer
-import datashader as ds
+import cudf
 import cupy as cp
-import pickle
-import datashader.transfer_functions as tf
-import pandas as pd
 import dask.dataframe as dd
+import datashader as ds
+import datashader.transfer_functions as tf
+import io
+import numpy as np
+import os
+import pandas as pd
+import pickle
+import requests
+
+try:
+    import dask_cudf
+except ImportError:
+    dask_cudf = None
 
 # Colors
 bgcolor = "#000000"  # mapbox dark map land color
@@ -45,7 +50,7 @@ colors["net"] = {
 
 
 # Figure template
-row_heights = [150, 440, 250, 75]
+row_heights = [150, 440, 300, 75]
 template = {
     "layout": {
         "paper_bgcolor": bgcolor,
@@ -59,7 +64,8 @@ template = {
     }
 }
 
-id2county = pickle.load(open("../id2county.pkl", "rb"))
+url = "https://raw.githubusercontent.com/rapidsai/plotly-dash-rapids-census-demo/main/id2county.pkl"
+id2county = pickle.load(io.BytesIO(requests.get(url).content))
 county2id = {v: k for k, v in id2county.items()}
 id2race = {
     0: "All",
@@ -75,16 +81,7 @@ race2id = {v: k for k, v in id2race.items()}
 
 mappings = {}
 mappings_hover = {}
-# Load mapbox token from environment variable or file
-token = os.getenv("MAPBOX_TOKEN")
 mapbox_style = "carto-darkmatter"
-if not token:
-    try:
-        token = "pk.eyJ1IjoibmlzaGFudGoiLCJhIjoiY2w1aXpwMXlkMDEyaDNjczBkZDVjY2l6dyJ9.7oLijsue-xOICmTqNInrBQ"
-
-    except Exception as e:
-        print("mapbox token not found, using open-street-maps")
-        mapbox_style = "carto-darkmatter"
 
 
 def set_projection_bounds(df_d):
@@ -165,7 +162,7 @@ def build_colorscale(colorscale_name, transform):
 
 
 def get_min_max(df, col):
-    if isinstance(df, dask_cudf.core.DataFrame):
+    if dask_cudf and isinstance(df, dask_cudf.core.DataFrame):
         return (df[col].min().compute(), df[col].max().compute())
     return (df[col].min(), df[col].max())
 
@@ -246,7 +243,6 @@ def build_datashader_plot(
         marker = {}
         layers = []
     else:
-
         img = tf.shade(
             tf.dynspread(agg, threshold=0.7),
             **datashader_color_scale,
@@ -275,18 +271,17 @@ def build_datashader_plot(
         "layout": {
             "template": template,
             "uirevision": True,
-            "zoom": 10,
             "mapbox": {
                 "style": mapbox_style,
-                "accesstoken": token,
                 "layers": layers,
                 "center": {
                     "lon": -78.81063494489342,
                     "lat": 37.471878534555074,
                 },
+                "zoom": 3,
             },
             "margin": {"r": 140, "t": 0, "l": 0, "b": 0},
-            "height": 700,
+            "height": 500,
             "shapes": [
                 {
                     "type": "rect",
@@ -445,7 +440,6 @@ def query_df_range_lat_lon(df, x0, x1, y0, y1, x, y):
 
 
 def bar_selected_ids(selection, column):  # select ids for each column
-
     if (column == "county_top") | (column == "county_bottom"):
         selected_ids = [county2id[p["label"]] for p in selection["points"]]
     else:
@@ -488,7 +482,6 @@ def build_histogram_default_bins(
     view_name,
     flag,
 ):
-
     if (view_name == "out") & (column == "race"):
         return no_data_figure()
 
@@ -497,7 +490,7 @@ def build_histogram_default_bins(
     if (column == "county_top") | (column == "county_bottom"):
         column = "county"
 
-    if isinstance(df, dask_cudf.core.DataFrame):
+    if dask_cudf and isinstance(df, dask_cudf.core.DataFrame):
         df = df[[column, "net"]].groupby(column)["net"].count().compute().to_pandas()
     elif isinstance(df, cudf.DataFrame):
         df = df[[column, "net"]].groupby(column)["net"].count().to_pandas()
@@ -584,10 +577,8 @@ def build_histogram_default_bins(
             "hovermode": "closest",
         },
     }
-
     if column not in selections:
-        for i in range(len(fig["data"])):
-            fig["data"][i]["selectedpoints"] = False
+        fig["data"][0]["selectedpoints"] = False
 
     return fig
 
@@ -744,18 +735,7 @@ def build_updated_figures_dask(
     n_selected_indicator = {
         "data": [
             {
-                "domain": {"x": [0.31, 0.41], "y": [0, 0.5]},
-                "title": {"text": "Query Result"},
-                "type": "indicator",
-                "value": len(df),
-                "number": {
-                    "font": {"color": text_color, "size": "50px"},
-                    "valueformat": ",",
-                    "suffix": " people",
-                },
-            },
-            {
-                "domain": {"x": [0.71, 0.81], "y": [0, 0.5]},
+                "domain": {"x": [0.21, 0.41], "y": [0, 0.5]},
                 "title": {"text": "Data Size"},
                 "type": "indicator",
                 "value": len(df),
@@ -834,7 +814,6 @@ def build_updated_figures(
     position_backup,
     view_name,
 ):
-
     colorscale_transform = "linear"
     selected = {}
 
@@ -951,18 +930,7 @@ def build_updated_figures(
     n_selected_indicator = {
         "data": [
             {
-                "domain": {"x": [0.31, 0.41], "y": [0, 0.5]},
-                "title": {"text": "Query Result"},
-                "type": "indicator",
-                "value": len(df),
-                "number": {
-                    "font": {"color": text_color, "size": "50px"},
-                    "valueformat": ",",
-                    "suffix": " people",
-                },
-            },
-            {
-                "domain": {"x": [0.71, 0.81], "y": [0, 0.5]},
+                "domain": {"x": [0.2, 0.45], "y": [0, 0.5]},
                 "title": {"text": "Data Size"},
                 "type": "indicator",
                 "value": len(df),
@@ -1016,9 +984,9 @@ def build_updated_figures(
     del df
     return (
         datashader_plot,
+        race_histogram,
         county_top_histogram,
         county_bottom_histogram,
-        race_histogram,
         n_selected_indicator,
         coordinates_4326_backup,
         position_backup,
@@ -1055,7 +1023,7 @@ def load_dataset(path, dtype="dask_cudf"):
         path = path + "/*"
     if dtype == "dask":
         return dd.read_parquet(path, split_row_groups=True)
-    elif dtype == "dask_cudf":
+    elif dask_cudf and dtype == "dask_cudf":
         return dask_cudf.read_parquet(path, split_row_groups=True)
     elif dtype == "pandas":
         return cudf.read_parquet(path).to_pandas()
