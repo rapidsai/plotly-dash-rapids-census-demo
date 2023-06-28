@@ -11,20 +11,32 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from distributed import Client
 from utils import *
+import tarfile
 
 # ### Dashboards start here
 text_color = "#cfd8dc"  # Material blue-grey 100
 
 DATA_PATH = "../data"
 DATA_PATH_STATE = f"{DATA_PATH}/state-wise-population"
+DATA_PATH_TOTAL = f"{DATA_PATH}/total_population_dataset.parquet"
 
-# Get list of state names from file names
+# Download the required states data
+census_data_url = "https://data.rapids.ai/viz-data/total_population_dataset.parquet"
+check_dataset(census_data_url, DATA_PATH_TOTAL)
+
+census_state_data_url = "https://data.rapids.ai/viz-data/state-wise-population.tar.xz"
+if not os.path.exists(DATA_PATH_STATE):
+    check_dataset(census_state_data_url, f"{DATA_PATH_STATE}.tar.xz")
+    print("Extracting state-wise-population.tar.xz ...")
+    with tarfile.open(f"{DATA_PATH_STATE}.tar.xz", "r:xz") as tar:
+        tar.extractall(DATA_PATH)
+    print("Done.")
+
 state_files = os.listdir(DATA_PATH_STATE)
 state_names = [os.path.splitext(f)[0] for f in state_files]
-
-DEFAULT_STATE = state_names[0]
-# append USA to state_names
+# add USA(combined dataset) to the list of states
 state_names.append("USA")
+
 
 (
     data_center_3857,
