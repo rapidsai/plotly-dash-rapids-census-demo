@@ -1,16 +1,21 @@
-import os
-import requests
-import dask_cudf
-import cudf
 from bokeh import palettes
-import numpy as np
 from pyproj import Transformer
-import datashader as ds
+import cudf
 import cupy as cp
-import pickle
-import datashader.transfer_functions as tf
-import pandas as pd
 import dask.dataframe as dd
+import datashader as ds
+import datashader.transfer_functions as tf
+import io
+import numpy as np
+import os
+import pandas as pd
+import pickle
+import requests
+
+try:
+    import dask_cudf
+except ImportError:
+    dask_cudf = None
 
 # Colors
 bgcolor = "#000000"  # mapbox dark map land color
@@ -59,7 +64,8 @@ template = {
     }
 }
 
-id2county = pickle.load(open("../id2county.pkl", "rb"))
+url = "https://raw.githubusercontent.com/rapidsai/plotly-dash-rapids-census-demo/main/id2county.pkl"
+id2county = pickle.load(io.BytesIO(requests.get(url).content))
 county2id = {v: k for k, v in id2county.items()}
 id2race = {
     0: "All",
@@ -75,16 +81,7 @@ race2id = {v: k for k, v in id2race.items()}
 
 mappings = {}
 mappings_hover = {}
-# Load mapbox token from environment variable or file
-token = os.getenv("MAPBOX_TOKEN")
 mapbox_style = "carto-darkmatter"
-if not token:
-    try:
-        token = "pk.eyJ1IjoibmlzaGFudGoiLCJhIjoiY2w1aXpwMXlkMDEyaDNjczBkZDVjY2l6dyJ9.7oLijsue-xOICmTqNInrBQ"
-
-    except Exception as e:
-        print("mapbox token not found, using open-street-maps")
-        mapbox_style = "carto-darkmatter"
 
 
 def set_projection_bounds(df_d):
@@ -165,7 +162,7 @@ def build_colorscale(colorscale_name, transform):
 
 
 def get_min_max(df, col):
-    if isinstance(df, dask_cudf.core.DataFrame):
+    if dask_cudf and isinstance(df, dask_cudf.core.DataFrame):
         return (df[col].min().compute(), df[col].max().compute())
     return (df[col].min(), df[col].max())
 
@@ -182,6 +179,16 @@ def build_datashader_plot(
 ):
     # global data_3857, data_center_3857, data_4326, data_center_4326
 
+    print(
+        df,
+        colorscale_name,
+        colorscale_transform,
+        new_coordinates,
+        position,
+        x_range,
+        y_range,
+        view_name,
+    )
     x0, x1 = x_range
     y0, y1 = y_range
 
@@ -274,15 +281,14 @@ def build_datashader_plot(
         "layout": {
             "template": template,
             "uirevision": True,
-            "zoom": 3,
             "mapbox": {
                 "style": mapbox_style,
-                "accesstoken": token,
                 "layers": layers,
                 "center": {
                     "lon": -78.81063494489342,
                     "lat": 37.471878534555074,
                 },
+                "zoom": 3,
             },
             "margin": {"r": 140, "t": 0, "l": 0, "b": 0},
             "height": 500,
@@ -494,7 +500,7 @@ def build_histogram_default_bins(
     if (column == "county_top") | (column == "county_bottom"):
         column = "county"
 
-    if isinstance(df, dask_cudf.core.DataFrame):
+    if dask_cudf and isinstance(df, dask_cudf.core.DataFrame):
         df = df[[column, "net"]].groupby(column)["net"].count().compute().to_pandas()
     elif isinstance(df, cudf.DataFrame):
         df = df[[column, "net"]].groupby(column)["net"].count().to_pandas()
@@ -1027,7 +1033,7 @@ def load_dataset(path, dtype="dask_cudf"):
         path = path + "/*"
     if dtype == "dask":
         return dd.read_parquet(path, split_row_groups=True)
-    elif dtype == "dask_cudf":
+    elif dask_cudf and dtype == "dask_cudf":
         return dask_cudf.read_parquet(path, split_row_groups=True)
     elif dtype == "pandas":
         return cudf.read_parquet(path).to_pandas()
