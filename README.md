@@ -1,6 +1,6 @@
 # Plotly-Dash + RAPIDS | Census 2020 Visualization
 
-[![Try it now in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/rapidsai/plotly-dash-rapids-census-demo/blob/main/plotly_demo/colab_plotly_rapids_app.ipynb)
+<a href="https://colab.research.google.com/github/rapidsai/plotly-dash-rapids-census-demo/blob/main/plotly_demo/colab_plotly_rapids_app.ipynb" target="_blank"><img src="https://colab.research.google.com/assets/colab-badge.svg"></a>
 
 ![dashboard_png_url](./assets/dashboard.png)
 
