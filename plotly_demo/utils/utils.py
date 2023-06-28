@@ -179,16 +179,6 @@ def build_datashader_plot(
 ):
     # global data_3857, data_center_3857, data_4326, data_center_4326
 
-    print(
-        df,
-        colorscale_name,
-        colorscale_transform,
-        new_coordinates,
-        position,
-        x_range,
-        y_range,
-        view_name,
-    )
     x0, x1 = x_range
     y0, y1 = y_range
 
