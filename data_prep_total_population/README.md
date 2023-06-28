@@ -32,4 +32,4 @@ Mappings for counties can be found in `id2county.pkl` file from root directory.
 
 ### Final Dataset
 
-You can download the final total population dataset [here](https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/total_population_dataset.parquet)
+You can download the final total population dataset [here](https://data.rapids.ai/viz-data/total_population_dataset.parquet)

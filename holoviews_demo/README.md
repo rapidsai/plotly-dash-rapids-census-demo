@@ -51,7 +51,7 @@ There is 1 main dataset:
 
 For more information on how the Net Migration Dataset was prepared to show individual points, refer to the `/data_prep_net_migration` folder.
 
-You can download the final net miragtion dataset [here](https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/net_migration_dataset.parquet)
+You can download the final net miragtion dataset [here](https://data.rapids.ai/viz-data/net_migration_dataset.parquet)
 
 ### Conda Env
 
