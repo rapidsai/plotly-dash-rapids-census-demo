@@ -1,6 +1,8 @@
 # Plotly-Dash + RAPIDS | Census 2020 Visualization
 
-![pr1](https://user-images.githubusercontent.com/35873124/189301695-328af0cc-1878-408d-ba01-bdbc61550628.png)
+[![Try it now in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/rapidsai/plotly-dash-rapids-census-demo/blob/Update-datasets-statewise/plotly_demo/colab_plotly_rapids_app.ipynb)
+
+![dashboard_png_url](./assets/dashboard.png)
 
 ## Charts
 
@@ -34,8 +36,8 @@ The visualization uses a Mapbox base layer that requires an access token. Create
 
 There is 1 main dataset:
 
-- [Total Population Dataset](https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/net_migration_dataset.parquet) ; Consists of Census 2020 total population with decennial migration from Census 2010 at a block level.
-- [Net Migration Dataset](https://rapidsai-data.s3.us-east-2.amazonaws.com/viz-data/net_migration_dataset.parquet) ; Net migration from Census 2010 at a block level.
+- [Total Population Dataset](https://data.rapids.ai/viz-data/net_migration_dataset.parquet) ; Consists of Census 2020 total population with decennial migration from Census 2010 at a block level.
+- [Net Migration Dataset](https://data.rapids.ai/viz-data/net_migration_dataset.parquet) ; Net migration from Census 2010 at a block level.
 
 For more information on how the Census 2020 and 2010 Migration data was prepared to show individual points, refer to the `/data_prep_total_population` folder.
 
