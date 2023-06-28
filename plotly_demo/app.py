@@ -168,7 +168,7 @@ app.layout = html.Div(
                                                             {"label": i, "value": i}
                                                             for i in state_names
                                                         ],
-                                                        value="DELAWARE",
+                                                        value="USA",
                                                     ),
                                                     style={
                                                         "width": "25%",
@@ -265,75 +265,77 @@ app.layout = html.Div(
                 # Race start
                 html.Div(
                     children=[
-                        html.Button(
-                            "Clear Selection",
-                            id="clear-race",
-                            className="reset-button",
-                        ),
-                        html.H4(
-                            [
-                                "Race Distribution",
+                        html.Div(
+                            children=[
+                                html.Button(
+                                    "Clear Selection",
+                                    id="clear-race",
+                                    className="reset-button",
+                                ),
+                                html.H4(
+                                    [
+                                        "Race Distribution",
+                                    ],
+                                    className="container_title",
+                                ),
+                                dcc.Graph(
+                                    id="race-histogram",
+                                    config={"displayModeBar": False},
+                                    figure=blank_fig(row_heights[2]),
+                                ),
                             ],
-                            className="container_title",
+                            className="one-third column pretty_container",
+                            id="race-div",
+                        ),  # County top starts
+                        html.Div(
+                            children=[
+                                html.Button(
+                                    "Clear Selection",
+                                    id="clear-county-top",
+                                    className="reset-button",
+                                ),
+                                html.H4(
+                                    [
+                                        "County-wise Top 15",
+                                    ],
+                                    className="container_title",
+                                ),
+                                dcc.Graph(
+                                    id="county-histogram-top",
+                                    config={"displayModeBar": False},
+                                    figure=blank_fig(row_heights[2]),
+                                    animate=False,
+                                ),
+                            ],
+                            className=" one-third column pretty_container",
+                            id="county-div-top",
                         ),
-                        dcc.Graph(
-                            id="race-histogram",
-                            config={"displayModeBar": False},
-                            figure=blank_fig(row_heights[2]),
+                        # County bottom starts
+                        html.Div(
+                            children=[
+                                html.Button(
+                                    "Clear Selection",
+                                    id="clear-county-bottom",
+                                    className="reset-button",
+                                ),
+                                html.H4(
+                                    [
+                                        "County-wise Bottom 15",
+                                    ],
+                                    className="container_title",
+                                ),
+                                dcc.Graph(
+                                    id="county-histogram-bottom",
+                                    config={"displayModeBar": False},
+                                    figure=blank_fig(row_heights[2]),
+                                    animate=False,
+                                ),
+                            ],
+                            className="one-third column pretty_container",
                         ),
                     ],
-                    className="four columns pretty_container",
-                    id="race-div",
-                    style={"marginRight": "1%"},
-                ),  # County top starts
-                html.Div(
-                    children=[
-                        html.Button(
-                            "Clear Selection",
-                            id="clear-county-top",
-                            className="reset-button",
-                        ),
-                        html.H4(
-                            [
-                                "County-wise Top 15",
-                            ],
-                            className="container_title",
-                        ),
-                        dcc.Graph(
-                            id="county-histogram-top",
-                            config={"displayModeBar": False},
-                            figure=blank_fig(row_heights[2]),
-                            animate=False,
-                        ),
-                    ],
-                    className="four columns pretty_container",
-                    id="county-div-top",
-                    style={"marginRight": "1%"},
-                ),
-                # County bottom starts
-                html.Div(
-                    children=[
-                        html.Button(
-                            "Clear Selection",
-                            id="clear-county-bottom",
-                            className="reset-button",
-                        ),
-                        html.H4(
-                            [
-                                "County-wise Bottom 15",
-                            ],
-                            className="container_title",
-                        ),
-                        dcc.Graph(
-                            id="county-histogram-bottom",
-                            config={"displayModeBar": False},
-                            figure=blank_fig(row_heights[2]),
-                            animate=False,
-                        ),
-                    ],
-                    className="four columns pretty_container",
-                    id="county-div-bottom",
-                ),
+                    className="twelve columns",
+                )
                 ############## End of  Bars #####################
             ]
         ),

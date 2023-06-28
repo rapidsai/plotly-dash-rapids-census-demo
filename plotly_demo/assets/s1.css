@@ -49,6 +49,7 @@
   .column:first-child,
   .columns:first-child {
     margin-left: 0; }
+  
 
   .one.column,
   .one.columns                    { width: 4.66666666667%; }
@@ -64,7 +65,8 @@
   .eleven.columns                 { width: 91.3333333333%; }
   .twelve.columns                 { width: 98%; margin-left: 0; margin-right: 0;}
 
-  .one-third.column               { width: 30.6666666667%; }
+  .one-third.column               { width: 32%; margin-right: 0.5;}
+  .one-third.column:last-child    { margin-right: 0;}
   .two-thirds.column              { width: 65.3333333333%; }
 
   .one-half.column                { width: 48%; }
